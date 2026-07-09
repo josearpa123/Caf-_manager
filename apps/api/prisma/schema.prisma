@@ -1,0 +1,11 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// El modelo de datos completo (Tenant, User, Proveedor, Recepcion, Lote,
+// Pago, Factura, etc.) se diseña en docs/requerimientos.md y se implementa aquí.
