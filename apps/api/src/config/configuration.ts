@@ -4,7 +4,12 @@ export default () => ({
     url: process.env.DATABASE_URL,
   },
   jwt: {
-    secret: process.env.JWT_SECRET,
-    expiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
+    accessSecret: process.env.JWT_ACCESS_SECRET,
+    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
+    platformSecret: process.env.JWT_PLATFORM_SECRET,
+    refreshExpiresInDays: parseInt(
+      process.env.JWT_REFRESH_EXPIRES_IN_DAYS ?? '30',
+      10,
+    ),
   },
 });

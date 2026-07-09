@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import configuration from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
+import { AuditModule } from './common/audit/audit.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -21,6 +22,7 @@ import { ReportesModule } from './modules/reportes/reportes.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
     PrismaModule,
+    AuditModule,
     PlatformModule,
     AuthModule,
     UsersModule,
