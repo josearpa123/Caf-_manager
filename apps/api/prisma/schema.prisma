@@ -7,5 +7,879 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// El modelo de datos completo (Tenant, User, Proveedor, Recepcion, Lote,
-// Pago, Factura, etc.) se diseña en docs/requerimientos.md y se implementa aquí.
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum EstadoTenant {
+  ACTIVO
+  SUSPENDIDO
+  PRUEBA
+}
+
+enum TipoIdentificacion {
+  CC
+  NIT
+  CE
+  TI
+  PASAPORTE
+}
+
+// Catálogo fijo de permisos (enum + tabla RolePermission). Cada tenant arma
+// roles propios combinando estos permisos libremente; el permiso en sí no es
+// editable por el tenant (se versiona junto con el código).
+enum Permission {
+  PROVEEDORES_VER
+  PROVEEDORES_CREAR
+  PROVEEDORES_EDITAR
+  PROVEEDORES_ELIMINAR
+
+  RECEPCION_VER
+  RECEPCION_CREAR
+  RECEPCION_EDITAR
+  RECEPCION_ELIMINAR
+
+  CALIDAD_VER
+  CALIDAD_EDITAR
+
+  PRECIOS_VER
+  PRECIOS_EDITAR
+
+  BODEGA_VER
+  BODEGA_SECADO_GESTIONAR
+  BODEGA_TRILLA_GESTIONAR
+  BODEGA_AJUSTES_GESTIONAR
+
+  VENTAS_VER
+  VENTAS_CREAR
+  VENTAS_EDITAR
+  VENTAS_ELIMINAR
+
+  PAGOS_VER
+  PAGOS_CREAR
+  PAGOS_EDITAR
+  PAGOS_ELIMINAR
+
+  ANTICIPOS_VER
+  ANTICIPOS_CREAR
+  ANTICIPOS_EDITAR
+
+  FACTURACION_VER
+  FACTURACION_EMITIR
+  FACTURACION_ANULAR
+
+  REPORTES_VER
+  REPORTES_EXPORTAR
+
+  USUARIOS_VER
+  USUARIOS_GESTIONAR
+  ROLES_GESTIONAR
+
+  PUNTOS_COMPRA_GESTIONAR
+  CONFIGURACION_EMPRESA_GESTIONAR
+
+  AUDITORIA_VER
+}
+
+// Tipos de café que efectivamente se COMPRAN en recepción.
+enum TipoCafeRecepcion {
+  MOJADO
+  PASILLA
+}
+
+// Tipos de café que existen como INVENTARIO / se pueden VENDER.
+enum TipoInventario {
+  MOJADO
+  PERGAMINO
+  ALMENDRA
+  PASILLA
+}
+
+enum ModoFactorRendimiento {
+  CALCULADO
+  MANUAL
+}
+
+enum DestinoPasilla {
+  MEZCLA
+  VENTA_SEPARADA
+}
+
+enum EstadoProcesoSecado {
+  EN_PROCESO
+  FINALIZADO
+}
+
+enum TipoMovimientoInventario {
+  ENTRADA
+  SALIDA
+  AJUSTE
+}
+
+enum OrigenMovimientoInventario {
+  RECEPCION
+  PROCESO_SECADO
+  PROCESO_TRILLA
+  MEZCLA_PASILLA
+  VENTA
+  AJUSTE_MANUAL
+}
+
+enum MetodoPago {
+  EFECTIVO
+  TRANSFERENCIA
+  CHEQUE
+  CREDITO
+}
+
+enum EstadoFactura {
+  PENDIENTE
+  EMITIDA
+  ANULADA
+  ERROR
+}
+
+enum ProveedorTecnologicoFacturacion {
+  NINGUNO
+  FACTUS
+  SIIGO
+}
+
+enum AccionAuditoria {
+  CREAR
+  EDITAR
+  ELIMINAR
+}
+
+enum CategoriaDefecto {
+  PRIMARIO
+  SECUNDARIO
+}
+
+// ============================================================
+// PLATAFORMA (super-admin, fuera de cualquier tenant)
+// ============================================================
+
+model PlatformAdmin {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  nombre       String
+  activo       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+// ============================================================
+// TENANCY, AUTH, USUARIOS Y PERMISOS
+// ============================================================
+
+model Tenant {
+  id          String       @id @default(cuid())
+  nombre      String
+  nit         String?
+  razonSocial String?
+  logoUrl     String?
+  email       String?
+  telefono    String?
+  direccion   String?
+  estado      EstadoTenant @default(PRUEBA)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  puntosCompra            PuntoCompra[]
+  roles                   Role[]
+  users                   User[]
+  proveedores             Proveedor[]
+  compradores             Comprador[]
+  configuracion           ConfiguracionTenant?
+  tablasPrecioTramo       TablaPrecioTramo[]
+  resolucionesFacturacion ResolucionFacturacion[]
+  recepciones             Recepcion[]
+  procesosSecado          ProcesoSecado[]
+  procesosTrilla          TrillaProceso[]
+  movimientosInventario   MovimientoInventario[]
+  anticipos               Anticipo[]
+  pagos                   Pago[]
+  conciliaciones          ConciliacionAnticipo[]
+  ventas                  Venta[]
+  facturas                Factura[]
+  auditLogs               AuditLog[]
+  notificaciones          Notificacion[]
+  rolePermissions         RolePermission[]
+  analisisCalidad         AnalisisCalidad[]
+
+  @@index([estado])
+}
+
+model PuntoCompra {
+  id           String   @id @default(cuid())
+  tenantId     String
+  nombre       String
+  direccion    String?
+  telefono     String?
+  municipio    String?
+  departamento String?
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  usuarios              User[]
+  recepciones           Recepcion[]
+  procesosSecado        ProcesoSecado[]
+  procesosTrilla        TrillaProceso[]
+  movimientosInventario MovimientoInventario[]
+  anticipos             Anticipo[]
+  pagos                 Pago[]
+  ventas                Venta[]
+  facturas              Factura[]
+  tablasPrecioTramo     TablaPrecioTramo[]
+  notificaciones        Notificacion[]
+
+  @@unique([tenantId, nombre])
+  @@index([tenantId])
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  tenantId    String
+  nombre      String
+  descripcion String?
+  esSistema   Boolean  @default(false) // rol "Administrador" auto-creado, no eliminable
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id])
+  permisos RolePermission[]
+  usuarios UserRole[]
+
+  @@unique([tenantId, nombre])
+  @@index([tenantId])
+}
+
+model RolePermission {
+  id         String     @id @default(cuid())
+  tenantId   String
+  roleId     String
+  permission Permission
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permission])
+  @@index([tenantId])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  tenantId      String
+  email         String    @unique
+  passwordHash  String
+  nombre        String
+  telefono      String?
+  puntoCompraId String? // null = acceso a todos los puntos del tenant
+  activo        Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  puntoCompra PuntoCompra? @relation(fields: [puntoCompraId], references: [id])
+
+  roles                 UserRole[]
+  refreshTokens         RefreshToken[]
+  proveedoresCreados    Proveedor[]            @relation("ProveedorCreadoPor")
+  recepcionesCreadas    Recepcion[]            @relation("RecepcionCreadaPor")
+  analisisCreados       AnalisisCalidad[]      @relation("AnalisisCreadoPor")
+  tablasPrecioCreadas   TablaPrecioTramo[]     @relation("TablaPrecioCreadaPor")
+  procesosSecadoCreados ProcesoSecado[]        @relation("ProcesoSecadoCreadoPor")
+  procesosTrillaCreados TrillaProceso[]        @relation("ProcesoTrillaCreadoPor")
+  movimientosCreados    MovimientoInventario[] @relation("MovimientoCreadoPor")
+  anticiposCreados      Anticipo[]             @relation("AnticipoCreadoPor")
+  pagosCreados          Pago[]                 @relation("PagoCreadoPor")
+  conciliacionesCreadas ConciliacionAnticipo[] @relation("ConciliacionCreadaPor")
+  ventasCreadas         Venta[]                @relation("VentaCreadaPor")
+  facturasCreadas       Factura[]              @relation("FacturaCreadaPor")
+  auditLogs             AuditLog[]
+  notificaciones        Notificacion[]
+
+  @@index([tenantId])
+  @@index([tenantId, puntoCompraId])
+}
+
+// M2M: un usuario puede tener varios roles combinables (unión de permisos).
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============================================================
+// PROVEEDORES (CAFICULTORES)
+// ============================================================
+
+model Proveedor {
+  id                   String             @id @default(cuid())
+  tenantId             String
+  tipoIdentificacion   TipoIdentificacion
+  numeroIdentificacion String
+  nombre               String
+  telefono             String?
+  whatsapp             String?
+  vereda               String?
+  municipio            String?
+  departamento         String?
+  activo               Boolean            @default(true)
+  notas                String?
+  createdById          String
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  createdBy User   @relation("ProveedorCreadoPor", fields: [createdById], references: [id])
+
+  recepciones    Recepcion[]
+  anticipos      Anticipo[]
+  pagos          Pago[]
+  conciliaciones ConciliacionAnticipo[]
+
+  @@unique([tenantId, tipoIdentificacion, numeroIdentificacion])
+  @@index([tenantId])
+  @@index([tenantId, municipio])
+  @@index([tenantId, activo])
+}
+
+model Comprador {
+  id             String   @id @default(cuid())
+  tenantId       String
+  nombre         String
+  identificacion String?
+  telefono       String?
+  activo         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  ventas Venta[]
+
+  @@index([tenantId])
+}
+
+// ============================================================
+// CONFIGURACIÓN DE TENANT / PRECIOS
+// ============================================================
+
+model ConfiguracionTenant {
+  id                      String   @id @default(cuid())
+  tenantId                String   @unique
+  humedadMinAceptable     Decimal  @db.Decimal(5, 2)
+  humedadMaxAceptable     Decimal  @db.Decimal(5, 2)
+  rendimientoMinAceptable Decimal? @db.Decimal(6, 2)
+  rendimientoMaxAceptable Decimal? @db.Decimal(6, 2)
+  saldoProveedorUmbral    Decimal? @db.Decimal(14, 2) // dispara notificación de saldo alto
+  updatedAt               DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// Tabla de precios por calidad: cada fila es un tramo con precio ABSOLUTO por
+// kg, vigente para una fecha. El "precio del día" es el conjunto de tramos con
+// esa fecha. Solo aplica a MOJADO (pasilla usa precio directo en la recepción).
+model TablaPrecioTramo {
+  id            String   @id @default(cuid())
+  tenantId      String
+  puntoCompraId String? // null = aplica a todos los puntos del tenant
+  fecha         DateTime @db.Date
+  nombre        String? // etiqueta libre, ej. "Primera", "Segunda"
+  factorMin     Decimal  @db.Decimal(6, 2)
+  factorMax     Decimal  @db.Decimal(6, 2)
+  humedadMin    Decimal  @db.Decimal(5, 2)
+  humedadMax    Decimal  @db.Decimal(5, 2)
+  precioKg      Decimal  @db.Decimal(12, 2) // precio final absoluto
+  createdById   String
+  createdAt     DateTime @default(now())
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  puntoCompra PuntoCompra? @relation(fields: [puntoCompraId], references: [id])
+  createdBy   User         @relation("TablaPrecioCreadaPor", fields: [createdById], references: [id])
+  recepciones Recepcion[]
+
+  @@index([tenantId, fecha])
+  @@index([tenantId, puntoCompraId, fecha])
+}
+
+model ResolucionFacturacion {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  puntoCompraId      String? // null = aplica a todo el tenant
+  prefijo            String?
+  numeroDesde        Int
+  numeroHasta        Int
+  numeroActual       Int      @default(0)
+  fechaVigenciaDesde DateTime @db.Date
+  fechaVigenciaHasta DateTime @db.Date
+  claveTecnica       String?
+  activo             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  facturas Factura[]
+
+  @@index([tenantId])
+  @@index([tenantId, activo])
+}
+
+// Catálogo GLOBAL (no por tenant) de defectos, norma Cenicafé/FNC. Se seedea una vez.
+model DefectoTipo {
+  id        String           @id @default(cuid())
+  codigo    String           @unique
+  nombre    String
+  categoria CategoriaDefecto
+  orden     Int              @default(0)
+  activo    Boolean          @default(true)
+
+  analisis DefectoAnalisis[]
+}
+
+// ============================================================
+// RECEPCIÓN Y CALIDAD (Recepción = Lote)
+// ============================================================
+
+model Recepcion {
+  id            String            @id @default(cuid())
+  tenantId      String
+  puntoCompraId String
+  proveedorId   String
+  codigo        String // ej. REC-2026-000123, único por tenant
+  tipoCafe      TipoCafeRecepcion
+  fecha         DateTime          @default(now())
+
+  pesoBruto Decimal @db.Decimal(10, 2)
+  pesoTara  Decimal @db.Decimal(10, 2)
+  pesoNeto  Decimal @db.Decimal(10, 2)
+
+  tablaPrecioTramoId String? // null para PASILLA (precio directo)
+  precioKg           Decimal @db.Decimal(12, 2) // copiado/inmutable al momento de la transacción
+  valorTotal         Decimal @db.Decimal(14, 2)
+
+  // Solo aplica cuando tipoCafe = PASILLA
+  destinoPasilla       DestinoPasilla?
+  fechaDecisionDestino DateTime?
+  decididoPorId        String?
+
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  puntoCompra      PuntoCompra       @relation(fields: [puntoCompraId], references: [id])
+  proveedor        Proveedor         @relation(fields: [proveedorId], references: [id])
+  tablaPrecioTramo TablaPrecioTramo? @relation(fields: [tablaPrecioTramoId], references: [id])
+  createdBy        User              @relation("RecepcionCreadaPor", fields: [createdById], references: [id])
+
+  analisisCalidad       AnalisisCalidad? // null para PASILLA
+  factura               Factura?
+  procesosSecado        ProcesoSecadoRecepcion[]
+  ventasOrigen          VentaLoteOrigen[]
+  movimientosInventario MovimientoInventario[]
+  pagos                 Pago[]
+  conciliaciones        ConciliacionAnticipo[]
+
+  @@unique([tenantId, codigo])
+  @@index([tenantId, fecha])
+  @@index([tenantId, proveedorId])
+  @@index([tenantId, puntoCompraId])
+  @@index([tenantId, tipoCafe])
+}
+
+// Solo existe para recepciones de tipoCafe = MOJADO (pasilla no se analiza).
+model AnalisisCalidad {
+  id          String @id @default(cuid())
+  tenantId    String
+  recepcionId String @unique
+
+  humedad    Decimal               @db.Decimal(5, 2)
+  modoFactor ModoFactorRendimiento
+
+  pesoMuestraKg         Decimal? @db.Decimal(8, 4) // si modoFactor = CALCULADO
+  pesoAlmendraMuestraKg Decimal? @db.Decimal(8, 4) // si modoFactor = CALCULADO
+  factorRendimiento     Decimal  @db.Decimal(6, 2) // valor final (calculado o manual)
+
+  densidad      Decimal? @db.Decimal(6, 2)
+  tamanoGrano   String?
+  observaciones String?
+
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  recepcion Recepcion @relation(fields: [recepcionId], references: [id], onDelete: Cascade)
+  createdBy User      @relation("AnalisisCreadoPor", fields: [createdById], references: [id])
+
+  defectos DefectoAnalisis[]
+
+  @@index([tenantId])
+}
+
+model DefectoAnalisis {
+  id                String   @id @default(cuid())
+  analisisCalidadId String
+  defectoTipoId     String
+  pesoKg            Decimal? @db.Decimal(8, 4)
+  porcentaje        Decimal? @db.Decimal(5, 2)
+
+  analisisCalidad AnalisisCalidad @relation(fields: [analisisCalidadId], references: [id], onDelete: Cascade)
+  defectoTipo     DefectoTipo     @relation(fields: [defectoTipoId], references: [id])
+
+  @@unique([analisisCalidadId, defectoTipoId])
+  @@index([analisisCalidadId])
+}
+
+// ============================================================
+// BODEGA / INVENTARIO
+// mojado -> (secado) -> pergamino -> (trilla) -> almendra
+// pasilla (compra directa seca) -> mezcla con pergamino | venta separada
+// ============================================================
+
+model ProcesoSecado {
+  id            String              @id @default(cuid())
+  tenantId      String
+  puntoCompraId String
+  codigo        String
+  fechaInicio   DateTime            @default(now())
+  fechaFin      DateTime?
+  estado        EstadoProcesoSecado @default(EN_PROCESO)
+
+  pesoMojadoTotalKg     Decimal? @db.Decimal(10, 2) // cache: suma de ProcesoSecadoRecepcion
+  pesoSecoResultanteKg  Decimal? @db.Decimal(10, 2) // ingresado al finalizar (lectura real de báscula)
+  rendimientoPorcentaje Decimal? @db.Decimal(5, 2) // cache: pesoSeco/pesoMojado*100
+
+  observaciones String?
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant                Tenant                   @relation(fields: [tenantId], references: [id])
+  puntoCompra           PuntoCompra              @relation(fields: [puntoCompraId], references: [id])
+  createdBy             User                     @relation("ProcesoSecadoCreadoPor", fields: [createdById], references: [id])
+  recepciones           ProcesoSecadoRecepcion[]
+  movimientosInventario MovimientoInventario[]
+
+  @@unique([tenantId, codigo])
+  @@index([tenantId, puntoCompraId])
+  @@index([tenantId, estado])
+}
+
+// M2M: un proceso de secado agrupa varias recepciones de mojado.
+model ProcesoSecadoRecepcion {
+  id                   String  @id @default(cuid())
+  procesoSecadoId      String
+  recepcionId          String
+  pesoMojadoAportadoKg Decimal @db.Decimal(10, 2)
+
+  procesoSecado ProcesoSecado @relation(fields: [procesoSecadoId], references: [id], onDelete: Cascade)
+  recepcion     Recepcion     @relation(fields: [recepcionId], references: [id])
+
+  @@unique([procesoSecadoId, recepcionId])
+  @@index([recepcionId])
+}
+
+model TrillaProceso {
+  id            String   @id @default(cuid())
+  tenantId      String
+  puntoCompraId String
+  codigo        String
+  fecha         DateTime @default(now())
+
+  pesoPergaminoKg       Decimal  @db.Decimal(10, 2)
+  pesoAlmendraKg        Decimal  @db.Decimal(10, 2)
+  pesoSubproductoKg     Decimal? @db.Decimal(10, 2) // broza/cisco, opcional
+  rendimientoPorcentaje Decimal  @db.Decimal(5, 2) // cache: almendra/pergamino*100
+
+  observaciones String?
+  createdById   String
+  createdAt     DateTime @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  puntoCompra PuntoCompra @relation(fields: [puntoCompraId], references: [id])
+  createdBy   User        @relation("ProcesoTrillaCreadoPor", fields: [createdById], references: [id])
+
+  movimientosInventario MovimientoInventario[]
+
+  @@unique([tenantId, codigo])
+  @@index([tenantId, puntoCompraId])
+}
+
+// Ledger único de inventario: fuente de verdad de existencias agregadas por
+// tenant + punto de compra + tipo de café. Inventario actual = SUM(cantidadKg)
+// agrupado (entradas positivas, salidas negativas vía tipoMovimiento).
+model MovimientoInventario {
+  id             String                     @id @default(cuid())
+  tenantId       String
+  puntoCompraId  String
+  tipoCafe       TipoInventario
+  tipoMovimiento TipoMovimientoInventario
+  cantidadKg     Decimal                    @db.Decimal(10, 2) // siempre positivo; el signo lo da tipoMovimiento
+  fecha          DateTime                   @default(now())
+  origen         OrigenMovimientoInventario
+
+  recepcionId     String?
+  procesoSecadoId String?
+  trillaProcesoId String?
+  ventaId         String?
+
+  notas       String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  puntoCompra   PuntoCompra    @relation(fields: [puntoCompraId], references: [id])
+  recepcion     Recepcion?     @relation(fields: [recepcionId], references: [id])
+  procesoSecado ProcesoSecado? @relation(fields: [procesoSecadoId], references: [id])
+  trillaProceso TrillaProceso? @relation(fields: [trillaProcesoId], references: [id])
+  venta         Venta?         @relation(fields: [ventaId], references: [id])
+  createdBy     User           @relation("MovimientoCreadoPor", fields: [createdById], references: [id])
+
+  @@index([tenantId, puntoCompraId, tipoCafe])
+  @@index([tenantId, fecha])
+  @@index([recepcionId])
+  @@index([procesoSecadoId])
+  @@index([trillaProcesoId])
+  @@index([ventaId])
+}
+
+// ============================================================
+// PAGOS Y FINANZAS (estado de cuenta por proveedor)
+// ============================================================
+
+model Anticipo {
+  id            String     @id @default(cuid())
+  tenantId      String
+  proveedorId   String
+  puntoCompraId String
+  monto         Decimal    @db.Decimal(14, 2)
+  fecha         DateTime   @default(now())
+  metodoPago    MetodoPago
+  referencia    String?
+  notas         String?
+  createdById   String
+  createdAt     DateTime   @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  proveedor   Proveedor   @relation(fields: [proveedorId], references: [id])
+  puntoCompra PuntoCompra @relation(fields: [puntoCompraId], references: [id])
+  createdBy   User        @relation("AnticipoCreadoPor", fields: [createdById], references: [id])
+
+  conciliaciones ConciliacionAnticipo[]
+
+  @@index([tenantId, proveedorId])
+  @@index([tenantId, fecha])
+}
+
+// metodoPago = CREDITO significa que esta compra/pago queda como deuda
+// pendiente (no hubo movimiento de caja real) hasta un pago posterior.
+model Pago {
+  id            String     @id @default(cuid())
+  tenantId      String
+  proveedorId   String
+  puntoCompraId String
+  recepcionId   String? // atajo: pago directo de una compra puntual
+  monto         Decimal    @db.Decimal(14, 2)
+  fecha         DateTime   @default(now())
+  metodoPago    MetodoPago
+  referencia    String?
+  numeroCheque  String?
+  notas         String?
+  createdById   String
+  createdAt     DateTime   @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  proveedor   Proveedor   @relation(fields: [proveedorId], references: [id])
+  puntoCompra PuntoCompra @relation(fields: [puntoCompraId], references: [id])
+  recepcion   Recepcion?  @relation(fields: [recepcionId], references: [id])
+  createdBy   User        @relation("PagoCreadoPor", fields: [createdById], references: [id])
+
+  conciliaciones ConciliacionAnticipo[]
+
+  @@index([tenantId, proveedorId])
+  @@index([tenantId, fecha])
+  @@index([recepcionId])
+}
+
+// Conciliación MANUAL: registra cómo un anticipo se aplicó posteriormente
+// contra una recepción y/o un pago formal.
+model ConciliacionAnticipo {
+  id            String   @id @default(cuid())
+  tenantId      String
+  proveedorId   String
+  anticipoId    String
+  recepcionId   String?
+  pagoId        String?
+  montoAplicado Decimal  @db.Decimal(14, 2)
+  fecha         DateTime @default(now())
+  notas         String?
+  createdById   String
+  createdAt     DateTime @default(now())
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  proveedor Proveedor  @relation(fields: [proveedorId], references: [id])
+  anticipo  Anticipo   @relation(fields: [anticipoId], references: [id])
+  recepcion Recepcion? @relation(fields: [recepcionId], references: [id])
+  pago      Pago?      @relation(fields: [pagoId], references: [id])
+  createdBy User       @relation("ConciliacionCreadaPor", fields: [createdById], references: [id])
+
+  @@index([tenantId, proveedorId])
+  @@index([anticipoId])
+  @@index([recepcionId])
+  @@index([pagoId])
+}
+
+// ============================================================
+// VENTAS
+// ============================================================
+
+model Venta {
+  id              String         @id @default(cuid())
+  tenantId        String
+  puntoCompraId   String
+  codigo          String
+  fecha           DateTime       @default(now())
+  tipoCafe        TipoInventario
+  compradorId     String?
+  compradorNombre String // siempre presente (texto libre o copiado del Comprador)
+  cantidadKg      Decimal        @db.Decimal(10, 2)
+  precioKg        Decimal        @db.Decimal(12, 2)
+  valorTotal      Decimal        @db.Decimal(14, 2)
+  observaciones   String?
+  createdById     String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  puntoCompra PuntoCompra @relation(fields: [puntoCompraId], references: [id])
+  comprador   Comprador?  @relation(fields: [compradorId], references: [id])
+  createdBy   User        @relation("VentaCreadaPor", fields: [createdById], references: [id])
+
+  lotesOrigen           VentaLoteOrigen[]
+  movimientosInventario MovimientoInventario[]
+
+  @@unique([tenantId, codigo])
+  @@index([tenantId, fecha])
+  @@index([tenantId, puntoCompraId])
+  @@index([compradorId])
+}
+
+// M2M: una venta puede combinar café de varios lotes (recepciones) de origen,
+// solo para trazabilidad/costeo — no descuenta inventario lote a lote.
+model VentaLoteOrigen {
+  id                  String  @id @default(cuid())
+  ventaId             String
+  recepcionId         String
+  cantidadKgAtribuida Decimal @db.Decimal(10, 2)
+
+  venta     Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  recepcion Recepcion @relation(fields: [recepcionId], references: [id])
+
+  @@unique([ventaId, recepcionId])
+  @@index([recepcionId])
+}
+
+// ============================================================
+// FACTURACIÓN ELECTRÓNICA (DIAN) — 1 factura : 1 recepción
+// ============================================================
+
+model Factura {
+  id                      String                          @id @default(cuid())
+  tenantId                String
+  puntoCompraId           String
+  recepcionId             String                          @unique
+  resolucionFacturacionId String?
+  numero                  Int?
+  cufe                    String?
+  estado                  EstadoFactura                   @default(PENDIENTE)
+  proveedorTecnologico    ProveedorTecnologicoFacturacion @default(NINGUNO)
+  payloadRequest          Json?
+  payloadResponse         Json?
+  urlPdf                  String?
+  urlXml                  String?
+  fechaEmision            DateTime?
+  motivoAnulacion         String?
+  createdById             String
+  createdAt               DateTime                        @default(now())
+  updatedAt               DateTime                        @updatedAt
+
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id])
+  puntoCompra           PuntoCompra            @relation(fields: [puntoCompraId], references: [id])
+  recepcion             Recepcion              @relation(fields: [recepcionId], references: [id])
+  resolucionFacturacion ResolucionFacturacion? @relation(fields: [resolucionFacturacionId], references: [id])
+  createdBy             User                   @relation("FacturaCreadaPor", fields: [createdById], references: [id])
+
+  @@index([tenantId, estado])
+  @@index([tenantId, puntoCompraId])
+}
+
+// ============================================================
+// AUDITORÍA Y NOTIFICACIONES (transversal)
+// ============================================================
+
+model AuditLog {
+  id              String          @id @default(cuid())
+  tenantId        String
+  userId          String?
+  entidad         String // ej. "Recepcion", "Pago", "TablaPrecioTramo", "Factura"
+  entidadId       String
+  accion          AccionAuditoria
+  datosAnteriores Json?
+  datosNuevos     Json?
+  ipAddress       String?
+  fecha           DateTime        @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, entidad, entidadId])
+  @@index([tenantId, fecha])
+  @@index([userId])
+}
+
+// MVP: único disparador implementado es saldo pendiente alto a un proveedor.
+model Notificacion {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  userId             String
+  puntoCompraId      String?
+  tipo               String
+  titulo             String
+  mensaje            String
+  leida              Boolean  @default(false)
+  entidadRelacionada String?
+  entidadId          String?
+  fecha              DateTime @default(now())
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  user        User         @relation(fields: [userId], references: [id])
+  puntoCompra PuntoCompra? @relation(fields: [puntoCompraId], references: [id])
+
+  @@index([tenantId, userId, leida])
+}

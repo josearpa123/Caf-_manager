@@ -39,3 +39,6 @@ coverage/
 
 # Docker volumes (si se montan localmente)
 docker/volumes/
+
+# Claude Code local session state
+.claude/

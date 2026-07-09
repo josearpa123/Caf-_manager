@@ -38,6 +38,17 @@
 - **Rango de humedad aceptable**: configurable por tenant (igual que la tabla de precios), no fijo en 10-12% para todos.
 - **Recibo de compra**: se genera como PDF/pantalla imprimible en cualquier impresora estándar o compartible por WhatsApp/email. No requiere integración con impresora térmica en el MVP.
 
+## Decisiones técnicas del schema (resolviendo ambigüedades del diseño)
+
+- **Roles por usuario**: un usuario puede tener VARIOS roles combinables (sus permisos se suman). Requiere tabla M2M `UserRole`, no un campo único `roleId`.
+- **Acceso a puntos de compra**: un usuario accede a TODOS los puntos del tenant o a UNO específico (no a un subconjunto). No se modela M2M usuario↔puntos de compra en el MVP.
+- **Método de pago "Crédito"**: es informativo — no es un movimiento de caja real, simplemente marca que esa compra queda como deuda pendiente con el proveedor hasta que se registre un pago real después.
+- **Tabla de precios por calidad**: cada tramo define un **precio ABSOLUTO por kg** (no un ajuste +/- sobre un precio base). El "precio del día" se materializa como el conjunto de tramos vigentes ese día — el admin actualiza/versiona la tabla cuando cambian los precios (probablemente a diario), no existe un "precio base" separado que se ajuste.
+- **Pasilla**: precio directo negociado por recepción (no pasa por la tabla de precios por calidad) y NO requiere análisis de calidad (no se le mide humedad ni factor de rendimiento) — solo se pesa y se registra.
+- **Trazabilidad de bodega**: se detiene en el nivel de recepción (venta → recepciones de origen). NO se rastrea el camino completo trilla→secado→recepción original; no aporta valor suficiente para el esfuerzo de modelarlo en el MVP.
+- **Notificaciones MVP**: único disparador para la primera versión: saldo pendiente alto a un proveedor (crédito + anticipos sin conciliar por encima de un umbral). Los demás disparadores propuestos (humedad fuera de rango, desviación de rendimiento de secado, inventario bajo) quedan fuera del MVP, se agregan después.
+- **Panel de super-admin de plataforma**: SÍ se necesita desde ya (no basta con script/Prisma Studio). Requiere un modelo de administrador de plataforma completamente separado de los usuarios de tenant, con su propio login, para: listar tenants existentes y crear un tenant nuevo + su primer usuario administrador durante el aprovisionamiento manual de la fase beta.
+
 ## Estado por módulo
 
 - [x] Arquitectura general (multi-tenancy, roles, unidad de medida, auditoría) — ver decisiones arriba
