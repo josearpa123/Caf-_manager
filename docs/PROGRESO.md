@@ -6,10 +6,10 @@
 
 ## Fase actual (según cronograma en `docs/doc.md` §7.2)
 
-**FASE 2: Desarrollo del MVP — Sprint 1-2, cerrando hacia Sprint 3-4**
+**FASE 2: Desarrollo del MVP — Sprint 3-4**
 
-Terminado: autenticación/usuarios, Proveedores completo, Recepción completo (con tabla de precios y catálogo de defectos), fix de bugs estructurales que bloqueaban TODO módulo tenant-scoped.
-Siguiente: módulo de **Calidad** ya tiene lo esencial (catálogo de defectos + el análisis se registra dentro de Recepción) — el siguiente ítem natural es **Bodega** (conversión mojado→seco→almendra) o **Pagos**, ver sección de abajo.
+Terminado: autenticación/usuarios, Proveedores, Recepción (con tabla de precios y catálogo de defectos), Bodega (inventario, secado, trilla, destino de pasilla), fix de bugs estructurales que bloqueaban TODO módulo tenant-scoped.
+Siguiente: **Pagos** (pagos a proveedores, anticipos, cuentas por pagar) — es lo que falta para cerrar el ciclo compra→bodega→pago; después **Ventas** para poder calcular rentabilidad por lote.
 
 ## Fase 1 — Planificación y Diseño: COMPLETA
 
@@ -43,16 +43,21 @@ Estos 4 fixes son la base que hace posible que Proveedores y Recepción funcione
   - `POST /recepcion` — crea una recepción MOJADO (con `AnalisisCalidad` + defectos anidados en la misma transacción, factor de rendimiento calculado o manual, matcheo automático del tramo de precio vigente según humedad+factor) o PASILLA (precio directo negociado, sin análisis de calidad). Genera código correlativo `REC-{año}-{secuencial}` por tenant.
   - `GET /recepcion` (filtros: proveedor, punto de compra, tipo, rango de fechas), `GET /recepcion/:id` (detalle completo).
   - **Alcance deliberadamente limitado en esta pasada**: no hay `PATCH`/`DELETE` de recepciones (son registros financieros — editarlas requiere recalcular inventario/pagos/facturas asociados, se deja para cuando existan esos módulos). Tampoco hay generación de PDF del recibo todavía.
+- **Bodega** (`src/modules/bodega`) — módulo completo:
+  - `GET /bodega/inventario` — stock agregado por punto de compra + tipo de café, calculado en vivo desde el ledger `MovimientoInventario` (no es una tabla de saldos cacheada).
+  - `POST /bodega/secado`, `GET /bodega/secado`, `GET /bodega/secado/:id`, `PATCH /bodega/secado/:id/finalizar` — agrupa una o más recepciones MOJADO (cada una se consume completa, no hay aporte parcial en el MVP), las marca `EN_PROCESO`, y al finalizar con el peso seco resultante calcula el % de rendimiento de secado y genera inventario de PERGAMINO.
+  - `POST /bodega/trilla`, `GET /bodega/trilla`, `GET /bodega/trilla/:id` — consume pergamino disponible (valida que haya stock suficiente antes de crear) y genera almendra + rendimiento.
+  - `PATCH /bodega/pasilla/:recepcionId/destino` — decide el destino de una recepción de pasilla (MEZCLA con pergamino, generando el movimiento de traspaso; o VENTA_SEPARADA, sin movimiento adicional). Solo se puede decidir una vez.
+  - **Gap encontrado y corregido de paso**: `RecepcionService.create()` no generaba ningún `MovimientoInventario` — el módulo de Bodega no habría tenido datos reales sin esto. Ahora cada recepción (mojado o pasilla) genera su entrada de inventario en la misma transacción.
 - **Audit log**: registro de cambios en módulos sensibles (`src/common/audit`).
 - Guards: `JwtAuthGuard`, `PermissionsGuard`, `PlatformAuthGuard` — registrados globalmente.
 
-Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, recepción mojado con factor calculado y defectos, recepción pasilla, error claro cuando no hay tramo vigente, aislamiento entre tenants, caso de permisos denegados (403).
+Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, recepción mojado con factor calculado y defectos, recepción pasilla, error claro cuando no hay tramo vigente, aislamiento entre tenants, caso de permisos denegados (403), y la cadena completa mojado→secado→pergamino→trilla→almendra + pasilla→mezcla→pergamino con sus validaciones (recepción duplicada en secado, stock insuficiente para trilla, destino ya decidido).
 
 ### Pendiente (scaffold vacío — controller/service/module creados pero SIN lógica de negocio)
-- `bodega` — conversión mojado→seco→almendra, pasilla (mezcla o venta separada) ⬅ **candidato a seguir**
-- `pagos` — pagos a proveedores, anticipos, cuentas por pagar
+- `pagos` — pagos a proveedores, anticipos, cuentas por pagar ⬅ **candidato a seguir**
 - `facturacion` — adaptador DIAN (Factus/Siigo, decisión de proveedor diferida)
-- `ventas` — venta de café procesado
+- `ventas` — venta de café procesado (consume el inventario de PERGAMINO/ALMENDRA/PASILLA que ya genera Bodega)
 - `reportes` — dashboard y KPIs
 
 ## Frontend (`apps/web` — Next.js)
@@ -67,14 +72,19 @@ Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, r
   - `app/(dashboard)/recepcion/[id]/page.tsx` — detalle de solo lectura.
   - `app/(dashboard)/recepcion/precios/page.tsx` — alta y listado de tramos de precio del día.
   - **Nota de diseño**: este formulario usa estado local (`useState`) en vez de react-hook-form+Zod compartido como Proveedores, porque los campos condicionales (mojado vs. pasilla, factor calculado vs. manual, lista dinámica de defectos) son más simples de manejar así dado el tiempo disponible. La validación fina vive en el backend; el frontend hace solo validación básica de campos requeridos y muestra los errores del servidor.
-- `packages/shared-types` ampliado con `PuntoCompra`, `DefectoTipo`, `TablaPrecioTramo`, `AnalisisCalidad`, `DefectoAnalisis`, `Recepcion`, `CategoriaDefecto`.
+- **Módulo Bodega completo**:
+  - `app/(dashboard)/bodega/page.tsx` — inventario actual y lista de pasillas pendientes de decidir destino (con botones de acción directa).
+  - `app/(dashboard)/bodega/secado/page.tsx` + `.../nuevo` + `.../[id]` — listado, alta (selección múltiple de recepciones mojado disponibles por punto de compra, con total en vivo) y detalle con acción de finalizar.
+  - `app/(dashboard)/bodega/trilla/page.tsx` — listado y alta en una sola página (como tabla de precios), con preview en vivo del rendimiento.
+- `packages/shared-types` ampliado con `PuntoCompra`, `DefectoTipo`, `TablaPrecioTramo`, `AnalisisCalidad`, `DefectoAnalisis`, `Recepcion`, `CategoriaDefecto`, `EstadoProcesoSecado`, `InventarioItem`, `ProcesoSecado`, `TrillaProceso`.
 
 ### Pendiente
-- Páginas de dashboard aún placeholder: bodega, pagos, facturación, reportes, configuración.
+- Páginas de dashboard aún placeholder: pagos, facturación, reportes, configuración.
 - `register` sigue como placeholder — **correcto así** (onboarding manual por diseño).
 - No hay refresh automático de token (access token dura 15 min; toca volver a loguear si expira a mitad de una sesión larga).
 - No se probó visualmente en un navegador real en ninguna sesión (no hay herramienta de automatización de navegador disponible) — se verificó con `next build`/`next lint` limpios, todas las rutas devolviendo 200, y las formas de datos del frontend confirmadas contra las respuestas reales de la API vía curl.
 - Recepción: no hay impresión/PDF del recibo, ni edición/anulación de una recepción ya creada (ver nota de alcance en la sección de backend).
+- Bodega/secado "nuevo": la lista de recepciones mojado disponibles no excluye del todo las que ya fueron usadas en otro proceso (el backend sí lo valida y rechaza con mensaje claro, pero la UI no las oculta de antemano).
 
 ## Cómo levantar el entorno de desarrollo
 
@@ -91,5 +101,5 @@ Para crear el primer tenant de prueba: `POST /platform/auth/login` (con `PLATFOR
 
 1. Leer este archivo.
 2. Si hay dudas de diseño, revisar `docs/requerimientos.md`.
-3. Elegir el siguiente módulo — recomendado **Bodega** (conversión mojado→seco, trilla, pasilla) porque es lo que consume el inventario que generan las Recepciones ya implementadas; alternativamente **Pagos** si se prioriza el flujo de caja con proveedores. Seguir el mismo patrón que Proveedores/Recepción: DTOs con class-validator, service con `@InjectTenantPrisma`, `tenantId` explícito en creates, controller con `@RequirePermissions`, y siempre probar con curl (crear tenant de prueba → login → CRUD) antes de dar el backend por terminado, porque el bug estructural de guards (ver arriba) es fácil de reintroducir si se copia un patrón viejo sin cuidado.
+3. Siguiente módulo recomendado: **Pagos** — registro de pagos a proveedores (efectivo/transferencia/cheque/crédito) y anticipos, ambos como transacciones independientes que se concilian manualmente (ver decisión en `requerimientos.md`: "Anticipos a proveedores"). Los modelos `Anticipo`, `Pago`, `ConciliacionAnticipo` ya están en el schema. Seguir el mismo patrón que Proveedores/Recepción/Bodega: DTOs con class-validator, service con `@InjectTenantPrisma`, `tenantId` explícito en creates, controller con `@RequirePermissions`, y siempre probar con curl (crear tenant de prueba → login → CRUD) antes de dar el backend por terminado.
 4. Al terminar una sesión de trabajo, actualizar este archivo.

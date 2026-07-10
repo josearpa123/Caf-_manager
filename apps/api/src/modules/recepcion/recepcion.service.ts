@@ -5,8 +5,11 @@ import {
 } from '@nestjs/common';
 import {
   ModoFactorRendimiento,
+  OrigenMovimientoInventario,
   Prisma,
   TipoCafeRecepcion,
+  TipoInventario,
+  TipoMovimientoInventario,
 } from '@prisma/client';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
@@ -187,6 +190,23 @@ export class RecepcionService {
             tablaPrecioTramoId,
             precioKg,
             valorTotal,
+            createdById,
+          },
+        });
+
+        await tx.movimientoInventario.create({
+          data: {
+            tenantId,
+            puntoCompraId: dto.puntoCompraId,
+            tipoCafe:
+              dto.tipoCafe === TipoCafeRecepcion.MOJADO
+                ? TipoInventario.MOJADO
+                : TipoInventario.PASILLA,
+            tipoMovimiento: TipoMovimientoInventario.ENTRADA,
+            cantidadKg: pesoNeto,
+            fecha,
+            origen: OrigenMovimientoInventario.RECEPCION,
+            recepcionId: recepcion.id,
             createdById,
           },
         });

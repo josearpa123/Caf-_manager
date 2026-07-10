@@ -112,6 +112,13 @@ export const Permission = {
 } as const;
 export type Permission = (typeof Permission)[keyof typeof Permission];
 
+export const EstadoProcesoSecado = {
+  EN_PROCESO: 'EN_PROCESO',
+  FINALIZADO: 'FINALIZADO',
+} as const;
+export type EstadoProcesoSecado =
+  (typeof EstadoProcesoSecado)[keyof typeof EstadoProcesoSecado];
+
 export const CategoriaDefecto = {
   PRIMARIO: 'PRIMARIO',
   SECUNDARIO: 'SECUNDARIO',
@@ -223,4 +230,54 @@ export interface Recepcion {
   puntoCompra: Pick<PuntoCompra, 'id' | 'nombre'> | Pick<PuntoCompra, 'nombre'>;
   tablaPrecioTramo: TablaPrecioTramo | null;
   analisisCalidad: AnalisisCalidad | null;
+}
+
+export interface InventarioItem {
+  puntoCompraId: string;
+  puntoCompraNombre: string;
+  tipoCafe: TipoInventario;
+  cantidadKg: number;
+}
+
+export interface ProcesoSecadoRecepcionItem {
+  id: string;
+  procesoSecadoId: string;
+  recepcionId: string;
+  pesoMojadoAportadoKg: string;
+  recepcion: { id: string; codigo: string; proveedor: { nombre: string } };
+}
+
+export interface ProcesoSecado {
+  id: string;
+  tenantId: string;
+  puntoCompraId: string;
+  codigo: string;
+  fechaInicio: string;
+  fechaFin: string | null;
+  estado: EstadoProcesoSecado;
+  pesoMojadoTotalKg: string;
+  pesoSecoResultanteKg: string | null;
+  rendimientoPorcentaje: string | null;
+  observaciones: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  puntoCompra: Pick<PuntoCompra, 'id' | 'nombre'> | Pick<PuntoCompra, 'nombre'>;
+  recepciones: ProcesoSecadoRecepcionItem[];
+}
+
+export interface TrillaProceso {
+  id: string;
+  tenantId: string;
+  puntoCompraId: string;
+  codigo: string;
+  fecha: string;
+  pesoPergaminoKg: string;
+  pesoAlmendraKg: string;
+  pesoSubproductoKg: string | null;
+  rendimientoPorcentaje: string;
+  observaciones: string | null;
+  createdById: string;
+  createdAt: string;
+  puntoCompra: Pick<PuntoCompra, 'id' | 'nombre'> | Pick<PuntoCompra, 'nombre'>;
 }
