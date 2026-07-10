@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Building2, ClipboardList, LayoutGrid, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Building2, ClipboardList, LayoutGrid, ShieldCheck } from 'lucide-react';
 import type { PlatformTenant } from '@coffee-manager/shared-types';
 import { PlatformAuthProvider, usePlatformAuth } from '@/lib/platform-auth';
 import { platformApi } from '@/lib/platform-api';
@@ -39,6 +40,13 @@ function PlatformShell({ children }: { children: React.ReactNode }) {
               'radial-gradient(60% 50% at 50% 0%, hsl(var(--primary) / 0.12), transparent)',
           }}
         />
+        <Link
+          href="/"
+          className="absolute left-4 top-4 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground sm:left-6 sm:top-6"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Volver al inicio
+        </Link>
         <div className="flex w-full max-w-sm flex-col items-center gap-6">
           <div className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
