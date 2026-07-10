@@ -6,6 +6,7 @@ export const EstadoTenant = {
   ACTIVO: 'ACTIVO',
   SUSPENDIDO: 'SUSPENDIDO',
   PRUEBA: 'PRUEBA',
+  PENDIENTE: 'PENDIENTE',
 } as const;
 export type EstadoTenant = (typeof EstadoTenant)[keyof typeof EstadoTenant];
 
@@ -415,6 +416,10 @@ export interface Plan {
   maxPuntosCompra: number | null;
   createdAt: string;
 }
+
+// Forma reducida de Plan que devuelve el endpoint público /registro/planes
+// (sin createdAt ni nada interno).
+export type PlanPublico = Pick<Plan, 'id' | 'nombre' | 'maxUsuarios' | 'maxPuntosCompra'>;
 
 export interface PlatformTenant {
   id: string;

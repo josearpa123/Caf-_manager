@@ -43,6 +43,19 @@ export class AuthService {
     return { permissions: [...permissions], roleNames };
   }
 
+  private assertTenantAccesible(estado: EstadoTenant) {
+    if (estado === EstadoTenant.SUSPENDIDO) {
+      throw new UnauthorizedException(
+        'Esta cuenta está suspendida. Contacte al administrador.',
+      );
+    }
+    if (estado === EstadoTenant.PENDIENTE) {
+      throw new UnauthorizedException(
+        'Esta cuenta está pendiente de aprobación. Un administrador la activará pronto.',
+      );
+    }
+  }
+
   private signAccessToken(payload: TenantJwtPayload): string {
     return this.jwt.sign(payload, {
       secret: this.config.get<string>('jwt.accessSecret'),
@@ -82,11 +95,7 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    if (user.tenant.estado === EstadoTenant.SUSPENDIDO) {
-      throw new UnauthorizedException(
-        'Esta cuenta está suspendida. Contacte al administrador.',
-      );
-    }
+    this.assertTenantAccesible(user.tenant.estado);
 
     const { permissions, roleNames } = this.computePermissions(user);
 
@@ -136,11 +145,7 @@ export class AuthService {
     if (!user.activo) {
       throw new UnauthorizedException('Usuario inactivo');
     }
-    if (user.tenant.estado === EstadoTenant.SUSPENDIDO) {
-      throw new UnauthorizedException(
-        'Esta cuenta está suspendida. Contacte al administrador.',
-      );
-    }
+    this.assertTenantAccesible(user.tenant.estado);
 
     await this.prisma.refreshToken.update({
       where: { id: existing.id },

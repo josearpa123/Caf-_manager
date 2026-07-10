@@ -4,6 +4,27 @@
 
 **Última actualización:** 2026-07-10
 
+## Landing page pública + autorregistro con aprobación (sesión 2026-07-10)
+
+Pedido del usuario: una página principal pública (Inicio/Sobre nosotros/Planes) con los logins visibles, y que el registro esté habilitado pero la cuenta quede pendiente de activación — la aprueba un admin de plataforma según el plan. Esto reemplaza la decisión anterior de la Fase 1 ("onboarding manual por diseño, `/register` placeholder") — ahora hay dos caminos: autorregistro público (pendiente de aprobación) o alta manual desde `/platform/tenants/nuevo`, conviven sin conflicto.
+
+- **Schema**: nuevo valor `PENDIENTE` en `EstadoTenant` (migración `20260710210331_tenant_pendiente_aprobacion`). Un tenant `PENDIENTE` no puede iniciar sesión — mismo mecanismo que ya bloqueaba `SUSPENDIDO` (`AuthService`), factorizado en un solo `assertTenantAccesible()` con mensaje distinto para cada caso.
+- **Backend** — nuevo módulo público `src/modules/registro` (sin ningún guard, endpoints con `@Public()`):
+  - `GET /registro/planes` — catálogo de planes reducido a solo lo necesario para mostrar precios/límites en la página pública (sin datos internos).
+  - `POST /registro` — autorregistro: crea Tenant en `PENDIENTE` (+ plan elegido opcional) + rol "Administrador" con todos los permisos + primer usuario, mismo patrón transaccional que `PlatformService.createTenant`, pero **forzando el estado** (un registro público nunca puede activarse solo, ni aunque alguien manipule el request). Rechaza correos duplicados con mensaje claro (`409 Ese correo ya está registrado`) en vez de dejar pasar un error crudo de Postgres.
+  - Aprobar sigue siendo el mismo `PATCH /platform/tenants/:id` que ya existía (`{ estado: 'ACTIVO' }`) — no hizo falta un endpoint nuevo para eso.
+  - Verificado con curl: registro público → login rechazado (`PENDIENTE`) → aparece en `/platform/tenants` → `PATCH` a `ACTIVO` → login exitoso. Y el rechazo por correo duplicado.
+- **Frontend**:
+  - `app/page.tsx` (raíz) reemplazado: antes redirigía siempre a `/login` o `/proveedores`; ahora, si no hay sesión, muestra una landing real (hero, características, "Sobre nosotros", "Planes" con los datos de `/registro/planes`, CTA) con botones **Ingresar** y **Crear cuenta** en el header, y un link discreto a `/platform/login` en el footer (no se promociona al público general). Si hay sesión activa, sigue redirigiendo al dashboard como antes.
+  - `app/(auth)/register/page.tsx` — antes placeholder, ahora formulario real (nombre del negocio, NIT opcional, datos del admin con `PasswordInput`, plan opcional) que llama a `POST /registro` y muestra el mensaje de "pendiente de aprobación" en vez de loguear automáticamente.
+  - `app/platform/page.tsx` — Badge nuevo para `PENDIENTE`, los tenants pendientes se listan primero, aviso visible cuando hay alguno, y botón **Aprobar** (en vez de Activar/Suspender) cuando el estado es `PENDIENTE`.
+  - `packages/shared-types`: `EstadoTenant.PENDIENTE` + `PlanPublico` (forma reducida de `Plan` para el endpoint público).
+
+### Pendiente / fuera de alcance
+- Sin envío de correo al aprobar/registrar (no hay servicio de email integrado en el proyecto) — el usuario se entera revisando `/platform` manualmente, o el interesado reintentando login.
+- No hay acción de "rechazar" un registro pendiente (solo aprobar vía cambio de estado) — si hace falta, se resuelve dejándolo `PENDIENTE` indefinidamente o reutilizando `SUSPENDIDO`.
+- El copy de "Sobre nosotros" es un placeholder razonable centrado en el producto (no tengo la historia real de la empresa) — se edita directamente en `app/page.tsx` cuando haya contenido de marca definitivo.
+
 ## Contratos de venta anticipada (sesión 2026-07-10)
 
 Pedido del usuario (gerente de compra): vender café por adelantado a una trilladora, fijando precio hoy, y que cuando efectivamente se venda/entregue el café más adelante, sea a ese precio ya pactado. Antes de construir se confirmaron 3 decisiones de diseño con el usuario: (1) las entregas contra un contrato son parciales — se va cumpliendo con varias ventas a medida que sale cosecha, no una sola entrega; (2) las trilladoras NO dan anticipo en dinero al firmar, solo se paga al entregar (así que no hace falta un concepto de "anticipo de venta", más simple que los `Anticipo` a proveedores); (3) el vencimiento del contrato es solo informativo, nunca bloquea ni cancela nada automáticamente — lo decide el operador.
@@ -195,8 +216,8 @@ Los 8 módulos definidos en `docs/requerimientos.md` ("Estado por módulo") tien
 
 ### Pendiente
 - Ningún módulo queda como placeholder — los 8 tienen pantallas reales.
-- `register` sigue como placeholder — **correcto así** (onboarding manual por diseño).
-- No hay refresh automático de token (access token dura 15 min; toca volver a loguear si expira a mitad de una sesión larga).
+- `register` ya no es placeholder — ver sección "Landing page pública + autorregistro con aprobación" más arriba (sesión 2026-07-10) para el estado actual.
+- El refresh automático de token y el resto de detalles de sesión están documentados en la sección "Exportar Excel en Reportes + sesión más larga" más arriba (sesión 2026-07-10) — esta línea quedaba desactualizada de antes de ese arreglo.
 - No se probó visualmente en un navegador real en ninguna sesión (no hay herramienta de automatización de navegador disponible) — se verificó con `next build`/`next lint` limpios, todas las rutas devolviendo 200, y las formas de datos del frontend confirmadas contra las respuestas reales de la API vía curl.
 - Recepción: no hay impresión/PDF del recibo, ni edición/anulación de una recepción ya creada (ver nota de alcance en la sección de backend).
 - Bodega/secado "nuevo": la lista de recepciones mojado disponibles no excluye del todo las que ya fueron usadas en otro proceso (el backend sí lo valida y rechaza con mensaje claro, pero la UI no las oculta de antemano).

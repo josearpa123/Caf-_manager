@@ -9,6 +9,7 @@ import { AuditModule } from './common/audit/audit.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { PlatformModule } from './modules/platform/platform.module';
+import { RegistroModule } from './modules/registro/registro.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
@@ -27,6 +28,7 @@ import { ReportesModule } from './modules/reportes/reportes.module';
     PrismaModule,
     AuditModule,
     PlatformModule,
+    RegistroModule,
     AuthModule,
     UsersModule,
     TenantsModule,
