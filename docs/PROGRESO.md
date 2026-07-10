@@ -2,14 +2,14 @@
 
 > Este archivo se actualiza al final de cada sesión de trabajo relevante. Es lo primero que hay que leer al retomar el proyecto (junto con `docs/requerimientos.md` para decisiones de diseño ya tomadas).
 
-**Última actualización:** 2026-07-09
+**Última actualización:** 2026-07-10
 
 ## Fase actual (según cronograma en `docs/doc.md` §7.2)
 
 **FASE 2: Desarrollo del MVP — Sprint 3-4**
 
-Terminado: autenticación/usuarios, Proveedores, Recepción (con tabla de precios y catálogo de defectos), Bodega (inventario, secado, trilla, destino de pasilla), fix de bugs estructurales que bloqueaban TODO módulo tenant-scoped.
-Siguiente: **Pagos** (pagos a proveedores, anticipos, cuentas por pagar) — es lo que falta para cerrar el ciclo compra→bodega→pago; después **Ventas** para poder calcular rentabilidad por lote.
+Terminado: autenticación/usuarios, Proveedores, Recepción (con tabla de precios y catálogo de defectos), Bodega (inventario, secado, trilla, destino de pasilla), Pagos (anticipos, pagos, conciliación manual, estado de cuenta), fix de bugs estructurales que bloqueaban TODO módulo tenant-scoped.
+Siguiente: **Ventas** — venta de café procesado (consume inventario de PERGAMINO/ALMENDRA/PASILLA) para poder calcular rentabilidad por lote; después `facturacion` (adaptador DIAN) y `reportes` (dashboard/KPIs).
 
 ## Fase 1 — Planificación y Diseño: COMPLETA
 
@@ -49,15 +49,21 @@ Estos 4 fixes son la base que hace posible que Proveedores y Recepción funcione
   - `POST /bodega/trilla`, `GET /bodega/trilla`, `GET /bodega/trilla/:id` — consume pergamino disponible (valida que haya stock suficiente antes de crear) y genera almendra + rendimiento.
   - `PATCH /bodega/pasilla/:recepcionId/destino` — decide el destino de una recepción de pasilla (MEZCLA con pergamino, generando el movimiento de traspaso; o VENTA_SEPARADA, sin movimiento adicional). Solo se puede decidir una vez.
   - **Gap encontrado y corregido de paso**: `RecepcionService.create()` no generaba ningún `MovimientoInventario` — el módulo de Bodega no habría tenido datos reales sin esto. Ahora cada recepción (mojado o pasilla) genera su entrada de inventario en la misma transacción.
+- **Pagos** (`src/modules/pagos`) — módulo completo, tres sub-recursos sobre los modelos `Anticipo`/`Pago`/`ConciliacionAnticipo` (ya existían en el schema):
+  - `POST /anticipos`, `GET /anticipos`, `GET /anticipos/:id` — anticipo a proveedor como transacción independiente (efectivo/transferencia/cheque; **CREDITO rechazado** con 400, un anticipo siempre es un movimiento de caja real). El detalle calcula `montoConciliado`/`saldoDisponible` en vivo a partir de sus conciliaciones.
+  - `POST /pagos`, `GET /pagos`, `GET /pagos/:id` — pago a proveedor, con atajo opcional `recepcionId` para asociarlo a una compra puntual (valida que la recepción sea del mismo proveedor). `metodoPago=CHEQUE` exige `numeroCheque` (`ValidateIf` en el DTO). `metodoPago=CREDITO` sí es válido aquí: es informativo, marca la compra como deuda pendiente sin mover caja real.
+  - `POST /conciliaciones`, `GET /conciliaciones` — aplica manualmente un anticipo contra una recepción y/o un pago (exige al menos uno de los dos), valida que ambos pertenezcan al mismo proveedor que el anticipo, y que `montoAplicado` no supere el saldo disponible del anticipo (recalculado sumando sus conciliaciones previas).
+  - `GET /pagos/cuenta/:proveedorId` — estado de cuenta informativo del proveedor (total comprado, pagado en efectivo/transferencia/cheque, marcado como crédito, anticipado, conciliado, sin conciliar, saldo pendiente estimado). **No es un saldo autoritativo**: es una vista de solo lectura sobre las transacciones independientes; la reconciliación real la hace el operador a mano (decisión de arquitectura en `requerimientos.md`, "Anticipos a proveedores").
+  - Sin `PATCH`/`DELETE` en ningún sub-recurso — mismo alcance deliberadamente limitado que Recepción (son registros financieros).
+  - `Pago`, `Anticipo`, `ConciliacionAnticipo` ya estaban en `AUDITED_MODELS` (`audit-log.extension.ts`), así que quedan auditados automáticamente sin código adicional — verificado con una query directa a `AuditLog`.
 - **Audit log**: registro de cambios en módulos sensibles (`src/common/audit`).
 - Guards: `JwtAuthGuard`, `PermissionsGuard`, `PlatformAuthGuard` — registrados globalmente.
 
-Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, recepción mojado con factor calculado y defectos, recepción pasilla, error claro cuando no hay tramo vigente, aislamiento entre tenants, caso de permisos denegados (403), y la cadena completa mojado→secado→pergamino→trilla→almendra + pasilla→mezcla→pergamino con sus validaciones (recepción duplicada en secado, stock insuficiente para trilla, destino ya decidido).
+Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, recepción mojado con factor calculado y defectos, recepción pasilla, error claro cuando no hay tramo vigente, aislamiento entre tenants, caso de permisos denegados (403), la cadena completa mojado→secado→pergamino→trilla→almendra + pasilla→mezcla→pergamino con sus validaciones (recepción duplicada en secado, stock insuficiente para trilla, destino ya decidido), y el ciclo anticipo→pago→conciliación→estado de cuenta con sus validaciones (anticipo con CREDITO rechazado, cheque sin número rechazado, conciliación que excede el saldo disponible rechazada, conciliación sin recepción ni pago rechazada).
 
 ### Pendiente (scaffold vacío — controller/service/module creados pero SIN lógica de negocio)
-- `pagos` — pagos a proveedores, anticipos, cuentas por pagar ⬅ **candidato a seguir**
+- `ventas` — venta de café procesado (consume el inventario de PERGAMINO/ALMENDRA/PASILLA que ya genera Bodega) ⬅ **candidato a seguir**
 - `facturacion` — adaptador DIAN (Factus/Siigo, decisión de proveedor diferida)
-- `ventas` — venta de café procesado (consume el inventario de PERGAMINO/ALMENDRA/PASILLA que ya genera Bodega)
 - `reportes` — dashboard y KPIs
 
 ## Frontend (`apps/web` — Next.js)
@@ -76,15 +82,22 @@ Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, r
   - `app/(dashboard)/bodega/page.tsx` — inventario actual y lista de pasillas pendientes de decidir destino (con botones de acción directa).
   - `app/(dashboard)/bodega/secado/page.tsx` + `.../nuevo` + `.../[id]` — listado, alta (selección múltiple de recepciones mojado disponibles por punto de compra, con total en vivo) y detalle con acción de finalizar.
   - `app/(dashboard)/bodega/trilla/page.tsx` — listado y alta en una sola página (como tabla de precios), con preview en vivo del rendimiento.
-- `packages/shared-types` ampliado con `PuntoCompra`, `DefectoTipo`, `TablaPrecioTramo`, `AnalisisCalidad`, `DefectoAnalisis`, `Recepcion`, `CategoriaDefecto`, `EstadoProcesoSecado`, `InventarioItem`, `ProcesoSecado`, `TrillaProceso`.
+- **Módulo Pagos completo**:
+  - `app/(dashboard)/pagos/page.tsx` — listado de pagos con enlaces a "Estado de cuenta", "Anticipos" y "Nuevo pago".
+  - `app/(dashboard)/pagos/nuevo/page.tsx` — formulario de pago; al elegir proveedor carga sus recepciones para el atajo opcional `recepcionId`; campo `numeroCheque` condicional cuando el método es CHEQUE.
+  - `app/(dashboard)/pagos/anticipos/page.tsx` + `.../nuevo` — listado y alta de anticipos (selector de método de pago limitado a efectivo/transferencia/cheque, sin CREDITO).
+  - `app/(dashboard)/pagos/anticipos/[id]/page.tsx` — detalle del anticipo (monto/conciliado/saldo disponible) con formulario de conciliación inline (contra recepción o contra pago del mismo proveedor, con `max` del input acotado al saldo disponible); se oculta el formulario cuando el saldo llega a cero.
+  - `app/(dashboard)/pagos/cuenta/page.tsx` — selector de proveedor + tarjetas KPI con el estado de cuenta (`GET /pagos/cuenta/:id`), con nota explícita de que el saldo es estimado/informativo, no autoritativo.
+- `packages/shared-types` ampliado con `PuntoCompra`, `DefectoTipo`, `TablaPrecioTramo`, `AnalisisCalidad`, `DefectoAnalisis`, `Recepcion`, `CategoriaDefecto`, `EstadoProcesoSecado`, `InventarioItem`, `ProcesoSecado`, `TrillaProceso`, `Anticipo`, `AnticipoDetalle`, `Pago`, `ConciliacionAnticipo`, `EstadoCuentaProveedor`.
 
 ### Pendiente
-- Páginas de dashboard aún placeholder: pagos, facturación, reportes, configuración.
+- Páginas de dashboard aún placeholder: facturación, reportes, configuración.
 - `register` sigue como placeholder — **correcto así** (onboarding manual por diseño).
 - No hay refresh automático de token (access token dura 15 min; toca volver a loguear si expira a mitad de una sesión larga).
 - No se probó visualmente en un navegador real en ninguna sesión (no hay herramienta de automatización de navegador disponible) — se verificó con `next build`/`next lint` limpios, todas las rutas devolviendo 200, y las formas de datos del frontend confirmadas contra las respuestas reales de la API vía curl.
 - Recepción: no hay impresión/PDF del recibo, ni edición/anulación de una recepción ya creada (ver nota de alcance en la sección de backend).
 - Bodega/secado "nuevo": la lista de recepciones mojado disponibles no excluye del todo las que ya fueron usadas en otro proceso (el backend sí lo valida y rechaza con mensaje claro, pero la UI no las oculta de antemano).
+- Pagos: no hay página de detalle de un pago individual (la lista ya muestra proveedor/recepción/método/monto, que cubre el caso de uso principal); tampoco hay filtros de fecha/proveedor en la UI de listados (el backend sí los soporta vía query params).
 
 ## Cómo levantar el entorno de desarrollo
 
@@ -101,5 +114,5 @@ Para crear el primer tenant de prueba: `POST /platform/auth/login` (con `PLATFOR
 
 1. Leer este archivo.
 2. Si hay dudas de diseño, revisar `docs/requerimientos.md`.
-3. Siguiente módulo recomendado: **Pagos** — registro de pagos a proveedores (efectivo/transferencia/cheque/crédito) y anticipos, ambos como transacciones independientes que se concilian manualmente (ver decisión en `requerimientos.md`: "Anticipos a proveedores"). Los modelos `Anticipo`, `Pago`, `ConciliacionAnticipo` ya están en el schema. Seguir el mismo patrón que Proveedores/Recepción/Bodega: DTOs con class-validator, service con `@InjectTenantPrisma`, `tenantId` explícito en creates, controller con `@RequirePermissions`, y siempre probar con curl (crear tenant de prueba → login → CRUD) antes de dar el backend por terminado.
+3. Siguiente módulo recomendado: **Ventas** — registro simple de venta de café procesado (comprador, cantidad, precio, lotes/recepciones de origen), consume el inventario agregado de PERGAMINO/ALMENDRA/PASILLA que ya genera Bodega (no lote por lote exacto, pero conserva referencia a los lotes de origen — ver `requerimientos.md`: "Ventas (detalle)"). Sin factura electrónica ni control de método de pago todavía (eso es `facturacion`, que sigue después). El modelo `Venta`/`VentaLoteOrigen` ya está en el schema. Seguir el mismo patrón que Proveedores/Recepción/Bodega/Pagos: DTOs con class-validator, service con `@InjectTenantPrisma`, `tenantId` explícito en creates, controller con `@RequirePermissions`, y siempre probar con curl (crear tenant de prueba → login → CRUD) antes de dar el backend por terminado. Revisar `getStockDisponible` en `bodega.service.ts` como referencia para descontar inventario al vender.
 4. Al terminar una sesión de trabajo, actualizar este archivo.

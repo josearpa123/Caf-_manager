@@ -266,6 +266,77 @@ export interface ProcesoSecado {
   recepciones: ProcesoSecadoRecepcionItem[];
 }
 
+export interface Anticipo {
+  id: string;
+  tenantId: string;
+  proveedorId: string;
+  puntoCompraId: string;
+  monto: string;
+  fecha: string;
+  metodoPago: MetodoPago;
+  referencia: string | null;
+  notas: string | null;
+  createdById: string;
+  createdAt: string;
+  proveedor: Pick<Proveedor, 'nombre'>;
+  puntoCompra: Pick<PuntoCompra, 'nombre'>;
+}
+
+export interface ConciliacionAnticipo {
+  id: string;
+  tenantId: string;
+  proveedorId: string;
+  anticipoId: string;
+  recepcionId: string | null;
+  pagoId: string | null;
+  montoAplicado: string;
+  fecha: string;
+  notas: string | null;
+  createdById: string;
+  createdAt: string;
+  proveedor: Pick<Proveedor, 'nombre'>;
+  anticipo: { id: string; fecha: string; monto: string };
+  recepcion: { codigo: string } | null;
+  pago: { id: string; fecha: string; monto: string } | null;
+}
+
+export interface AnticipoDetalle extends Anticipo {
+  conciliaciones: ConciliacionAnticipo[];
+  montoConciliado: number;
+  saldoDisponible: number;
+}
+
+export interface Pago {
+  id: string;
+  tenantId: string;
+  proveedorId: string;
+  puntoCompraId: string;
+  recepcionId: string | null;
+  monto: string;
+  fecha: string;
+  metodoPago: MetodoPago;
+  referencia: string | null;
+  numeroCheque: string | null;
+  notas: string | null;
+  createdById: string;
+  createdAt: string;
+  proveedor: Pick<Proveedor, 'nombre'>;
+  puntoCompra: Pick<PuntoCompra, 'nombre'>;
+  recepcion: { codigo: string } | null;
+}
+
+export interface EstadoCuentaProveedor {
+  proveedorId: string;
+  proveedorNombre: string;
+  totalComprado: number;
+  totalPagadoEfectivo: number;
+  totalPagosCredito: number;
+  totalAnticipos: number;
+  totalConciliado: number;
+  anticiposSinConciliar: number;
+  saldoPendienteEstimado: number;
+}
+
 export interface TrillaProceso {
   id: string;
   tenantId: string;
