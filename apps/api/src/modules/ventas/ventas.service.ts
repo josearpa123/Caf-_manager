@@ -4,8 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  EstadoContratoVenta,
   OrigenMovimientoInventario,
   Prisma,
+  TipoInventario,
   TipoMovimientoInventario,
 } from '@prisma/client';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
@@ -77,10 +79,43 @@ export class VentasService {
       throw new BadRequestException('El punto de compra está inactivo');
   }
 
+  // Si la venta viene de un contrato, el tipo de café, precio y comprador
+  // quedan fijados por el contrato (no por lo que mande el cliente), y se
+  // valida que la cantidad no exceda el saldo pendiente de entrega.
+  private async resolverContrato(contratoVentaId: string, cantidadKg: number) {
+    const contrato = await this.prisma.contratoVenta.findUnique({
+      where: { id: contratoVentaId },
+    });
+    if (!contrato)
+      throw new BadRequestException('El contrato indicado no existe en este tenant');
+    if (contrato.estado !== EstadoContratoVenta.VIGENTE) {
+      throw new BadRequestException(
+        'Este contrato no está vigente (ya fue cumplido o cancelado)',
+      );
+    }
+    const saldoPendienteKg =
+      Number(contrato.cantidadKgPactada) - Number(contrato.cantidadKgEntregada);
+    if (cantidadKg > saldoPendienteKg) {
+      throw new BadRequestException(
+        `La cantidad excede el saldo pendiente del contrato (disponible: ${saldoPendienteKg.toFixed(2)} kg)`,
+      );
+    }
+    return contrato;
+  }
+
   async create(tenantId: string, createdById: string, dto: CreateVentaDto) {
     await this.assertPuntoCompraActivo(dto.puntoCompraId);
 
-    if (dto.compradorId) {
+    const contrato = dto.contratoVentaId
+      ? await this.resolverContrato(dto.contratoVentaId, dto.cantidadKg)
+      : null;
+
+    const tipoCafe: TipoInventario = contrato ? contrato.tipoCafe : dto.tipoCafe!;
+    const precioKg = contrato ? Number(contrato.precioKg) : dto.precioKg!;
+    const compradorId = contrato ? contrato.compradorId : dto.compradorId;
+    const compradorNombre = contrato ? contrato.compradorNombre : dto.compradorNombre!;
+
+    if (!contrato && dto.compradorId) {
       const comprador = await this.prisma.comprador.findUnique({
         where: { id: dto.compradorId },
       });
@@ -111,15 +146,15 @@ export class VentasService {
 
     const disponible = await this.bodegaService.getStockDisponible(
       dto.puntoCompraId,
-      dto.tipoCafe,
+      tipoCafe,
     );
     if (dto.cantidadKg > disponible) {
       throw new BadRequestException(
-        `No hay suficiente inventario de ${dto.tipoCafe} en este punto de compra (disponible: ${disponible.toFixed(2)} kg)`,
+        `No hay suficiente inventario de ${tipoCafe} en este punto de compra (disponible: ${disponible.toFixed(2)} kg)`,
       );
     }
 
-    const valorTotal = Math.round(dto.cantidadKg * dto.precioKg * 100) / 100;
+    const valorTotal = Math.round(dto.cantidadKg * precioKg * 100) / 100;
     const fecha = new Date();
 
     return this.prisma.$transaction(async (tx) => {
@@ -136,12 +171,13 @@ export class VentasService {
           puntoCompraId: dto.puntoCompraId,
           codigo,
           fecha,
-          tipoCafe: dto.tipoCafe,
-          compradorId: dto.compradorId,
-          compradorNombre: dto.compradorNombre,
+          tipoCafe,
+          compradorId,
+          compradorNombre,
           cantidadKg: dto.cantidadKg,
-          precioKg: dto.precioKg,
+          precioKg,
           valorTotal,
+          contratoVentaId: dto.contratoVentaId,
           observaciones: dto.observaciones,
           createdById,
         },
@@ -159,7 +195,7 @@ export class VentasService {
         data: {
           tenantId,
           puntoCompraId: dto.puntoCompraId,
-          tipoCafe: dto.tipoCafe,
+          tipoCafe,
           tipoMovimiento: TipoMovimientoInventario.SALIDA,
           cantidadKg: dto.cantidadKg,
           fecha,
@@ -168,6 +204,21 @@ export class VentasService {
           createdById,
         },
       });
+
+      if (contrato) {
+        const entregadaTotal =
+          Number(contrato.cantidadKgEntregada) + dto.cantidadKg;
+        await tx.contratoVenta.update({
+          where: { id: contrato.id },
+          data: {
+            cantidadKgEntregada: entregadaTotal,
+            estado:
+              entregadaTotal >= Number(contrato.cantidadKgPactada)
+                ? EstadoContratoVenta.CUMPLIDO
+                : undefined,
+          },
+        });
+      }
 
       return tx.venta.findUniqueOrThrow({
         where: { id: venta.id },

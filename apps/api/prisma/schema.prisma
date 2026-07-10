@@ -226,6 +226,7 @@ model Tenant {
   pagos                   Pago[]
   conciliaciones          ConciliacionAnticipo[]
   ventas                  Venta[]
+  contratosVenta          ContratoVenta[]
   facturas                Factura[]
   auditLogs               AuditLog[]
   notificaciones          Notificacion[]
@@ -258,6 +259,7 @@ model PuntoCompra {
   anticipos             Anticipo[]
   pagos                 Pago[]
   ventas                Venta[]
+  contratosVenta        ContratoVenta[]
   facturas              Factura[]
   tablasPrecioTramo     TablaPrecioTramo[]
   notificaciones        Notificacion[]
@@ -325,6 +327,7 @@ model User {
   pagosCreados          Pago[]                 @relation("PagoCreadoPor")
   conciliacionesCreadas ConciliacionAnticipo[] @relation("ConciliacionCreadaPor")
   ventasCreadas         Venta[]                @relation("VentaCreadaPor")
+  contratosVentaCreados ContratoVenta[]        @relation("ContratoVentaCreadoPor")
   facturasCreadas       Factura[]              @relation("FacturaCreadaPor")
   auditLogs             AuditLog[]
   notificaciones        Notificacion[]
@@ -403,8 +406,9 @@ model Comprador {
   activo         Boolean  @default(true)
   createdAt      DateTime @default(now())
 
-  tenant Tenant  @relation(fields: [tenantId], references: [id])
-  ventas Venta[]
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  ventas         Venta[]
+  contratosVenta ContratoVenta[]
 
   @@index([tenantId])
 }
@@ -795,21 +799,68 @@ model Venta {
   cantidadKg      Decimal        @db.Decimal(10, 2)
   precioKg        Decimal        @db.Decimal(12, 2)
   valorTotal      Decimal        @db.Decimal(14, 2)
+  contratoVentaId String? // si viene de un contrato, precioKg queda fijado por el contrato
   observaciones   String?
   createdById     String
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
-  tenant      Tenant      @relation(fields: [tenantId], references: [id])
-  puntoCompra PuntoCompra @relation(fields: [puntoCompraId], references: [id])
-  comprador   Comprador?  @relation(fields: [compradorId], references: [id])
-  createdBy   User        @relation("VentaCreadaPor", fields: [createdById], references: [id])
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  puntoCompra   PuntoCompra    @relation(fields: [puntoCompraId], references: [id])
+  comprador     Comprador?     @relation(fields: [compradorId], references: [id])
+  contratoVenta ContratoVenta? @relation(fields: [contratoVentaId], references: [id])
+  createdBy     User           @relation("VentaCreadaPor", fields: [createdById], references: [id])
 
   lotesOrigen           VentaLoteOrigen[]
   movimientosInventario MovimientoInventario[]
 
   @@unique([tenantId, codigo])
   @@index([tenantId, fecha])
+  @@index([tenantId, puntoCompraId])
+  @@index([compradorId])
+  @@index([contratoVentaId])
+}
+
+enum EstadoContratoVenta {
+  VIGENTE
+  CUMPLIDO
+  CANCELADO
+}
+
+// Venta anticipada a precio fijo con una trilladora/comprador: se pacta hoy
+// cantidad + precio por kg, y se va cumpliendo con una o más Ventas
+// posteriores (entregas parciales) hasta completar cantidadKgPactada. El
+// vencimiento (fechaLimite) es solo informativo — no bloquea ni cancela nada
+// automáticamente, lo decide el operador (ver requerimientos/decisión de
+// diseño de esta sesión).
+model ContratoVenta {
+  id                  String              @id @default(cuid())
+  tenantId            String
+  puntoCompraId       String
+  codigo              String // CTR-{año}-{secuencial}
+  compradorId         String?
+  compradorNombre     String
+  tipoCafe            TipoInventario
+  cantidadKgPactada   Decimal             @db.Decimal(10, 2)
+  cantidadKgEntregada Decimal             @default(0) @db.Decimal(10, 2)
+  precioKg            Decimal             @db.Decimal(12, 2) // fijo: las ventas contra este contrato heredan este precio
+  fecha               DateTime            @default(now())
+  fechaLimite         DateTime?           @db.Date
+  estado              EstadoContratoVenta @default(VIGENTE)
+  observaciones       String?
+  createdById         String
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  puntoCompra PuntoCompra @relation(fields: [puntoCompraId], references: [id])
+  comprador   Comprador?  @relation(fields: [compradorId], references: [id])
+  createdBy   User        @relation("ContratoVentaCreadoPor", fields: [createdById], references: [id])
+
+  ventas Venta[]
+
+  @@unique([tenantId, codigo])
+  @@index([tenantId, estado])
   @@index([tenantId, puntoCompraId])
   @@index([compradorId])
 }

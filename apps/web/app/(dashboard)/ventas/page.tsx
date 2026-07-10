@@ -43,6 +43,9 @@ export default function VentasPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Ventas</h1>
         <div className="flex gap-2">
+          <Link href="/ventas/contratos" className={buttonVariants({ variant: 'outline' })}>
+            Contratos
+          </Link>
           <Link href="/ventas/compradores" className={buttonVariants({ variant: 'outline' })}>
             Compradores
           </Link>
@@ -81,7 +84,14 @@ export default function VentasPage() {
               <TableCell className="text-muted-foreground">
                 {new Date(v.fecha).toLocaleDateString('es-CO')}
               </TableCell>
-              <TableCell className="text-muted-foreground">{v.compradorNombre}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {v.compradorNombre}
+                {v.contratoVentaId && (
+                  <Badge variant="outline" className="ml-2">
+                    Contrato
+                  </Badge>
+                )}
+              </TableCell>
               <TableCell>
                 <Badge variant={tipoCafeVariant(v.tipoCafe)}>{v.tipoCafe}</Badge>
               </TableCell>

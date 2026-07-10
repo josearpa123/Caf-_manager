@@ -481,6 +481,7 @@ export interface Venta {
   cantidadKg: string;
   precioKg: string;
   valorTotal: string;
+  contratoVentaId: string | null;
   observaciones: string | null;
   createdById: string;
   createdAt: string;
@@ -488,6 +489,47 @@ export interface Venta {
   puntoCompra: Pick<PuntoCompra, 'nombre'>;
   comprador: Pick<Comprador, 'nombre'> | null;
   lotesOrigen?: VentaLoteOrigenItem[];
+}
+
+export const EstadoContratoVenta = {
+  VIGENTE: 'VIGENTE',
+  CUMPLIDO: 'CUMPLIDO',
+  CANCELADO: 'CANCELADO',
+} as const;
+export type EstadoContratoVenta =
+  (typeof EstadoContratoVenta)[keyof typeof EstadoContratoVenta];
+
+export interface ContratoVentaVentaItem {
+  id: string;
+  codigo: string;
+  fecha: string;
+  cantidadKg: string;
+  valorTotal: string;
+}
+
+export interface ContratoVenta {
+  id: string;
+  tenantId: string;
+  puntoCompraId: string;
+  codigo: string;
+  compradorId: string | null;
+  compradorNombre: string;
+  tipoCafe: TipoInventario;
+  cantidadKgPactada: string;
+  cantidadKgEntregada: string;
+  precioKg: string;
+  fecha: string;
+  fechaLimite: string | null;
+  estado: EstadoContratoVenta;
+  observaciones: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  puntoCompra: Pick<PuntoCompra, 'nombre'>;
+  comprador: Pick<Comprador, 'nombre'> | null;
+  ventas?: ContratoVentaVentaItem[];
+  saldoPendienteKg: number;
+  vencido: boolean;
 }
 
 export interface ReportesCompraPorTipo {

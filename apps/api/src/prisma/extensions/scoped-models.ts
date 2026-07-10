@@ -28,6 +28,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   'Pago',
   'ConciliacionAnticipo',
   'Venta',
+  'ContratoVenta',
   'Factura',
   'AuditLog',
   'Notificacion',

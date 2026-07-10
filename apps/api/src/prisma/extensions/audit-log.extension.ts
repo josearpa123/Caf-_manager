@@ -11,6 +11,7 @@ const AUDITED_MODELS = new Set([
   'Anticipo',
   'ConciliacionAnticipo',
   'Venta',
+  'ContratoVenta',
 ]);
 
 const toClientProp = (model: string) =>

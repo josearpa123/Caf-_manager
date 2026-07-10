@@ -4,6 +4,24 @@
 
 **Última actualización:** 2026-07-10
 
+## Contratos de venta anticipada (sesión 2026-07-10)
+
+Pedido del usuario (gerente de compra): vender café por adelantado a una trilladora, fijando precio hoy, y que cuando efectivamente se venda/entregue el café más adelante, sea a ese precio ya pactado. Antes de construir se confirmaron 3 decisiones de diseño con el usuario: (1) las entregas contra un contrato son parciales — se va cumpliendo con varias ventas a medida que sale cosecha, no una sola entrega; (2) las trilladoras NO dan anticipo en dinero al firmar, solo se paga al entregar (así que no hace falta un concepto de "anticipo de venta", más simple que los `Anticipo` a proveedores); (3) el vencimiento del contrato es solo informativo, nunca bloquea ni cancela nada automáticamente — lo decide el operador.
+
+- **Schema**: nuevo modelo `ContratoVenta` (código `CTR-{año}-{secuencial}`, comprador, tipo de café, `cantidadKgPactada`/`cantidadKgEntregada`, `precioKg` fijo, `fechaLimite` opcional, `estado`: VIGENTE/CUMPLIDO/CANCELADO) + `Venta.contratoVentaId` opcional. Migración `20260710203417_contratos_venta_anticipada`. Agregado a `TENANT_SCOPED_MODELS` y `AUDITED_MODELS`.
+- **Backend** (`src/modules/ventas/contratos-venta.{service,controller}.ts`, permisos `VENTAS_*` reutilizados, sin permisos nuevos):
+  - `POST /contratos-venta` — crea el contrato en VIGENTE.
+  - `GET /contratos-venta`, `GET /contratos-venta/:id` — cada contrato devuelve `saldoPendienteKg` y `vencido` **calculados al vuelo** (no se persisten), coherente con la decisión de que el vencimiento es solo informativo.
+  - `PATCH /contratos-venta/:id/cancelar` — solo si está VIGENTE.
+  - **`VentasService.create()` extendido**: `CreateVentaDto.contratoVentaId` opcional. Si se manda, `tipoCafe`/`precioKg`/`compradorId`/`compradorNombre` se **derivan del contrato del lado del servidor** (el cliente no los controla, así el precio queda de verdad bloqueado) y se valida que `cantidadKg` no exceda el saldo pendiente del contrato — independiente de la validación de stock físico disponible, que sigue aplicando igual. Dentro de la misma transacción que crea la venta, incrementa `cantidadKgEntregada` del contrato y lo marca `CUMPLIDO` si llega a completarse.
+  - Verificado con curl: contrato de 20kg cumplido con dos entregas parciales (12+8) tomando el precio del contrato sin que el cliente lo mande, transición automática a CUMPLIDO, rechazo de venta contra contrato ya cumplido/cancelado, rechazo por exceder saldo del contrato (independiente del rechazo por falta de stock físico, probado por separado), y cancelación de contrato sin entregas.
+- **Frontend**: `/ventas/contratos` (listado con badge de estado + "Vencido" si aplica), `/ventas/contratos/nuevo`, `/ventas/contratos/[id]` (resumen, saldo, historial de entregas con link a cada venta, botón cancelar, botón "Registrar entrega" que lleva a `/ventas/nueva?contratoVentaId=...`). `/ventas/nueva` ahora tiene un selector de contrato opcional al inicio del formulario: al elegir uno, bloquea (deshabilita) tipo de café, comprador y precio, y limita la cantidad al saldo pendiente — la venta libre (sin contrato) sigue funcionando exactamente igual que antes.
+
+### Pendiente / fuera de alcance
+- Sin anticipo de venta (dinero que entra del comprador) — decisión explícita del usuario, no aplica a su operación.
+- El contrato no valida que haya stock disponible al momento de crearlo (es normal: se pactan contratos antes de tener el café listo) — la validación de stock ocurre en cada venta/entrega individual, como cualquier venta normal.
+- No hay recordatorio/notificación de contratos por vencer — el campo `vencido` es visible en la UI pero pasivo, no genera alertas todavía (mismo patrón que las notificaciones in-app pendientes del resto del sistema).
+
 ## Exportar Excel en Reportes + sesión más larga con refresh silencioso (sesión 2026-07-10)
 
 Dos pedidos puntuales del usuario:

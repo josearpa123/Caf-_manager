@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type {
   Comprador,
+  ContratoVenta,
   InventarioItem,
   PuntoCompra,
   Recepcion,
@@ -21,14 +22,25 @@ interface LoteEntry {
   cantidadKgAtribuida: string;
 }
 
+function formatMoney(value: number) {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 export default function NuevaVentaPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [puntosCompra, setPuntosCompra] = useState<PuntoCompra[]>([]);
   const [compradores, setCompradores] = useState<Comprador[]>([]);
   const [inventario, setInventario] = useState<InventarioItem[]>([]);
   const [recepciones, setRecepciones] = useState<Recepcion[]>([]);
+  const [contratos, setContratos] = useState<ContratoVenta[]>([]);
 
+  const [contratoVentaId, setContratoVentaId] = useState('');
   const [puntoCompraId, setPuntoCompraId] = useState('');
   const [tipoCafe, setTipoCafe] = useState<string>(TipoInventario.PERGAMINO);
   const [compradorId, setCompradorId] = useState('');
@@ -48,7 +60,34 @@ export default function NuevaVentaPage() {
     api.get<PuntoCompra[]>('/puntos-compra').then(setPuntosCompra).catch(() => {});
     api.get<Comprador[]>('/compradores').then(setCompradores).catch(() => {});
     api.get<InventarioItem[]>('/bodega/inventario').then(setInventario).catch(() => {});
+    api
+      .get<ContratoVenta[]>('/contratos-venta?estado=VIGENTE')
+      .then(setContratos)
+      .catch(() => {});
   }, []);
+
+  // Si se llega desde el detalle de un contrato ("Registrar entrega"), lo
+  // preselecciona apenas la lista de contratos vigentes esté cargada.
+  useEffect(() => {
+    const desdeUrl = searchParams.get('contratoVentaId');
+    if (desdeUrl && contratos.some((c) => c.id === desdeUrl)) {
+      setContratoVentaId(desdeUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contratos]);
+
+  const contrato = contratos.find((c) => c.id === contratoVentaId) ?? null;
+
+  useEffect(() => {
+    if (contrato) {
+      setTipoCafe(contrato.tipoCafe);
+      setCompradorId(contrato.compradorId ?? '');
+      setCompradorNombre(contrato.compradorNombre);
+      setPrecioKg(contrato.precioKg);
+      if (!puntoCompraId) setPuntoCompraId(contrato.puntoCompraId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contrato]);
 
   useEffect(() => {
     setLotes([]);
@@ -109,16 +148,23 @@ export default function NuevaVentaPage() {
       setError('Agrega al menos un lote de origen');
       return;
     }
+    if (contrato && Number(cantidadKg) > contrato.saldoPendienteKg) {
+      setError(
+        `La cantidad excede el saldo pendiente del contrato (${contrato.saldoPendienteKg.toFixed(2)} kg)`,
+      );
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       const venta = await api.post<{ id: string }>('/ventas', {
         puntoCompraId,
-        tipoCafe,
+        contratoVentaId: contratoVentaId || undefined,
+        tipoCafe: contrato ? undefined : tipoCafe,
         compradorId: compradorId || undefined,
-        compradorNombre,
+        compradorNombre: contrato ? undefined : compradorNombre,
         cantidadKg: Number(cantidadKg),
-        precioKg: Number(precioKg),
+        precioKg: contrato ? undefined : Number(precioKg),
         observaciones: observaciones || undefined,
         lotesOrigen: lotes.map((l) => ({
           recepcionId: l.recepcionId,
@@ -138,6 +184,29 @@ export default function NuevaVentaPage() {
       <h1 className="text-2xl font-semibold">Nueva venta</h1>
 
       <form onSubmit={onSubmit} className="mt-6 flex max-w-2xl flex-col gap-6">
+        <div className="flex flex-col gap-1.5 rounded-md border p-4">
+          <Label htmlFor="contratoVentaId">Contrato de venta anticipada (opcional)</Label>
+          <Select
+            id="contratoVentaId"
+            value={contratoVentaId}
+            onChange={(e) => setContratoVentaId(e.target.value)}
+          >
+            <option value="">Ninguno — venta libre</option>
+            {contratos.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.codigo} — {c.compradorNombre} — {c.tipoCafe} — saldo{' '}
+                {c.saldoPendienteKg.toFixed(2)} kg
+              </option>
+            ))}
+          </Select>
+          {contrato && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Precio bloqueado en {formatMoney(Number(contrato.precioKg))}/kg. Saldo disponible
+              para entregar: {contrato.saldoPendienteKg.toFixed(2)} kg.
+            </p>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="puntoCompraId">Punto de compra</Label>
@@ -157,7 +226,12 @@ export default function NuevaVentaPage() {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="tipoCafe">Tipo de café</Label>
-            <Select id="tipoCafe" value={tipoCafe} onChange={(e) => setTipoCafe(e.target.value)}>
+            <Select
+              id="tipoCafe"
+              value={tipoCafe}
+              onChange={(e) => setTipoCafe(e.target.value)}
+              disabled={!!contrato}
+            >
               {Object.values(TipoInventario).map((t) => (
                 <option key={t} value={t}>
                   {t}
@@ -179,6 +253,7 @@ export default function NuevaVentaPage() {
               id="compradorId"
               value={compradorId}
               onChange={(e) => onSeleccionarComprador(e.target.value)}
+              disabled={!!contrato}
             >
               <option value="">Ninguno — escribir nombre libre</option>
               {compradores.map((c) => (
@@ -194,6 +269,7 @@ export default function NuevaVentaPage() {
               id="compradorNombre"
               value={compradorNombre}
               onChange={(e) => setCompradorNombre(e.target.value)}
+              disabled={!!contrato}
               required
             />
           </div>
@@ -206,6 +282,7 @@ export default function NuevaVentaPage() {
               id="cantidadKg"
               type="number"
               step="0.01"
+              max={contrato ? contrato.saldoPendienteKg : undefined}
               value={cantidadKg}
               onChange={(e) => setCantidadKg(e.target.value)}
               required
@@ -219,6 +296,7 @@ export default function NuevaVentaPage() {
               step="1"
               value={precioKg}
               onChange={(e) => setPrecioKg(e.target.value)}
+              disabled={!!contrato}
               required
             />
           </div>
