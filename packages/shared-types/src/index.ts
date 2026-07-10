@@ -66,6 +66,14 @@ export const EstadoFactura = {
 } as const;
 export type EstadoFactura = (typeof EstadoFactura)[keyof typeof EstadoFactura];
 
+export const ProveedorTecnologicoFacturacion = {
+  NINGUNO: 'NINGUNO',
+  FACTUS: 'FACTUS',
+  SIIGO: 'SIIGO',
+} as const;
+export type ProveedorTecnologicoFacturacion =
+  (typeof ProveedorTecnologicoFacturacion)[keyof typeof ProveedorTecnologicoFacturacion];
+
 export const Permission = {
   PROVEEDORES_VER: 'PROVEEDORES_VER',
   PROVEEDORES_CREAR: 'PROVEEDORES_CREAR',
@@ -416,6 +424,31 @@ export interface PlatformTenant {
   createdAt: string;
   plan: Plan | null;
   _count: { users: number; puntosCompra: number };
+}
+
+export interface Factura {
+  id: string;
+  tenantId: string;
+  puntoCompraId: string;
+  recepcionId: string;
+  resolucionFacturacionId: string | null;
+  numero: number | null;
+  cufe: string | null;
+  estado: EstadoFactura;
+  proveedorTecnologico: ProveedorTecnologicoFacturacion;
+  urlPdf: string | null;
+  urlXml: string | null;
+  fechaEmision: string | null;
+  motivoAnulacion: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  puntoCompra: Pick<PuntoCompra, 'nombre'>;
+  recepcion: {
+    codigo: string;
+    valorTotal: string;
+    proveedor: Pick<Proveedor, 'nombre' | 'numeroIdentificacion'>;
+  };
 }
 
 export interface Comprador {
