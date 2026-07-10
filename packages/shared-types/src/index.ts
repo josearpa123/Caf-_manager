@@ -457,6 +457,39 @@ export interface Venta {
   lotesOrigen?: VentaLoteOrigenItem[];
 }
 
+export interface ReportesCompraPorTipo {
+  tipoCafe: TipoCafeRecepcion;
+  kg: number;
+  valor: number;
+  cantidad: number;
+}
+
+export interface ReportesVentaPorTipo {
+  tipoCafe: TipoInventario;
+  kg: number;
+  valor: number;
+  cantidad: number;
+}
+
+export interface ReportesSaldoProveedor {
+  proveedorId: string;
+  proveedorNombre: string;
+  saldoPendienteEstimado: number;
+}
+
+export interface ReportesDashboard {
+  compras: { porTipo: ReportesCompraPorTipo[]; totalKg: number; totalValor: number };
+  ventas: { porTipo: ReportesVentaPorTipo[]; totalKg: number; totalValor: number };
+  margenBrutoPeriodo: number;
+  calidadPromedio: {
+    humedadPromedio: number | null;
+    factorRendimientoPromedio: number | null;
+    muestras: number;
+  };
+  inventario: InventarioItem[];
+  saldoProveedores: { totalEstimado: number; proveedores: ReportesSaldoProveedor[] };
+}
+
 export interface TrillaProceso {
   id: string;
   tenantId: string;
