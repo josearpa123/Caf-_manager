@@ -418,6 +418,45 @@ export interface PlatformTenant {
   _count: { users: number; puntosCompra: number };
 }
 
+export interface Comprador {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  identificacion: string | null;
+  telefono: string | null;
+  activo: boolean;
+  createdAt: string;
+}
+
+export interface VentaLoteOrigenItem {
+  id: string;
+  ventaId: string;
+  recepcionId: string;
+  cantidadKgAtribuida: string;
+  recepcion: { id: string; codigo: string; proveedor: { nombre: string } };
+}
+
+export interface Venta {
+  id: string;
+  tenantId: string;
+  puntoCompraId: string;
+  codigo: string;
+  fecha: string;
+  tipoCafe: TipoInventario;
+  compradorId: string | null;
+  compradorNombre: string;
+  cantidadKg: string;
+  precioKg: string;
+  valorTotal: string;
+  observaciones: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  puntoCompra: Pick<PuntoCompra, 'nombre'>;
+  comprador: Pick<Comprador, 'nombre'> | null;
+  lotesOrigen?: VentaLoteOrigenItem[];
+}
+
 export interface TrillaProceso {
   id: string;
   tenantId: string;

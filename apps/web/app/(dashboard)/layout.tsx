@@ -9,6 +9,7 @@ const navItems = [
   { href: '/proveedores', label: 'Proveedores' },
   { href: '/recepcion', label: 'Recepción' },
   { href: '/bodega', label: 'Bodega' },
+  { href: '/ventas', label: 'Ventas' },
   { href: '/pagos', label: 'Pagos' },
   { href: '/facturacion', label: 'Facturación' },
   { href: '/reportes', label: 'Reportes' },

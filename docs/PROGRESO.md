@@ -8,8 +8,8 @@
 
 **FASE 2: Desarrollo del MVP — Sprint 3-4**
 
-Terminado: autenticación/usuarios, Proveedores, Recepción (con tabla de precios, catálogo de defectos, y compra directa de pergamino seco), Bodega (inventario, secado, trilla, destino de pasilla), Pagos (anticipos, pagos, conciliación manual, estado de cuenta), Plan/límites por tenant + panel de super-admin + Configuración (puntos de compra, usuarios, roles), fix de bugs estructurales que bloqueaban TODO módulo tenant-scoped.
-Siguiente: **Ventas** — venta de café procesado (consume inventario de PERGAMINO/ALMENDRA/PASILLA) para poder calcular rentabilidad por lote; después `facturacion` (adaptador DIAN) y `reportes` (dashboard/KPIs).
+Terminado: autenticación/usuarios, Proveedores, Recepción (con tabla de precios, catálogo de defectos, y compra directa de pergamino seco), Bodega (inventario, secado, trilla, destino de pasilla), Pagos (anticipos, pagos, conciliación manual, estado de cuenta), Plan/límites por tenant + panel de super-admin + Configuración (puntos de compra, usuarios, roles), Ventas (compradores, venta con trazabilidad de lotes de origen, descuento de inventario), fix de bugs estructurales que bloqueaban TODO módulo tenant-scoped.
+Siguiente: `facturacion` (adaptador DIAN, proveedor por decidir) o `reportes` (dashboard/KPIs) — con Ventas cerrado ya se puede calcular rentabilidad por lote (compra en Recepción vs. venta), que era el objetivo pendiente del MVP original.
 
 ## Fase 1 — Planificación y Diseño: COMPLETA
 
@@ -85,14 +85,20 @@ Verificado end-to-end con curl: creación de plan, asignación a tenant, bloqueo
   - `GET /pagos/cuenta/:proveedorId` — estado de cuenta informativo del proveedor (total comprado, pagado en efectivo/transferencia/cheque, marcado como crédito, anticipado, conciliado, sin conciliar, saldo pendiente estimado). **No es un saldo autoritativo**: es una vista de solo lectura sobre las transacciones independientes; la reconciliación real la hace el operador a mano (decisión de arquitectura en `requerimientos.md`, "Anticipos a proveedores").
   - Sin `PATCH`/`DELETE` en ningún sub-recurso — mismo alcance deliberadamente limitado que Recepción (son registros financieros).
   - `Pago`, `Anticipo`, `ConciliacionAnticipo` ya estaban en `AUDITED_MODELS` (`audit-log.extension.ts`), así que quedan auditados automáticamente sin código adicional — verificado con una query directa a `AuditLog`.
+- **Ventas** (`src/modules/ventas`) — módulo completo, dos sub-recursos:
+  - **Compradores**: CRUD simple (`crear/listar/ver/editar` — sin `createdById`, el modelo no lo tiene) para reutilizar compradores frecuentes; `Venta.compradorNombre` siempre queda como texto libre (copiado del comprador seleccionado o escrito a mano), `compradorId` es opcional.
+  - **Ventas**: `POST /ventas` — vende un `tipoCafe` (`TipoInventario`: MOJADO/PERGAMINO/ALMENDRA/PASILLA) de un punto de compra. Valida stock disponible con `BodegaService.getStockDisponible()` (mismo helper que usa Trilla), genera código `VTA-{año}-{secuencial}`, y en la misma transacción crea la `Venta`, sus `VentaLoteOrigen` (trazabilidad hacia las recepciones de origen) y el `MovimientoInventario` de SALIDA con `origen=VENTA`.
+  - **Validación de trazabilidad**: la suma de `lotesOrigen[].cantidadKgAtribuida` debe coincidir con `cantidadKg` de la venta (tolerancia de redondeo 0.01 kg) — rechazada con 400 si no cuadra. Las recepciones referenciadas solo se validan por existencia/tenant, no por tipo: la trazabilidad se detiene a nivel de recepción por decisión de diseño (no se rastrea el camino secado/trilla → recepción original, ver `requerimientos.md`).
+  - `GET /ventas` (filtros: punto de compra, comprador, tipo, rango de fechas), `GET /ventas/:id` (detalle con lotes de origen).
+  - Sin `PATCH`/`DELETE` — mismo alcance deliberadamente limitado que Recepción/Pagos (registros que tocan inventario).
+  - `VentasModule` importa `BodegaModule` para inyectar `BodegaService` (patrón: un módulo de negocio dependiendo de otro vía `imports`, primera vez que se usa así en este backend).
 - **Audit log**: registro de cambios en módulos sensibles (`src/common/audit`).
 - Guards: `JwtAuthGuard`, `PermissionsGuard`, `PlatformAuthGuard` — registrados globalmente.
 
-Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, recepción de pergamino con factor calculado/manual y defectos, recepción de mojado y pasilla a precio directo (sin análisis de calidad, rechazadas si falta `precioKg`), error claro cuando no hay tramo vigente para pergamino, aislamiento entre tenants, caso de permisos denegados (403), la cadena completa mojado→secado→pergamino→trilla→almendra + pasilla→mezcla→pergamino con sus validaciones (recepción duplicada en secado, stock insuficiente para trilla, destino ya decidido), y el ciclo anticipo→pago→conciliación→estado de cuenta con sus validaciones (anticipo con CREDITO rechazado, cheque sin número rechazado, conciliación que excede el saldo disponible rechazada, conciliación sin recepción ni pago rechazada).
+Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, recepción de pergamino con factor calculado/manual y defectos, recepción de mojado y pasilla a precio directo (sin análisis de calidad, rechazadas si falta `precioKg`), error claro cuando no hay tramo vigente para pergamino, aislamiento entre tenants, caso de permisos denegados (403), la cadena completa mojado→secado→pergamino→trilla→almendra + pasilla→mezcla→pergamino con sus validaciones (recepción duplicada en secado, stock insuficiente para trilla, destino ya decidido), el ciclo anticipo→pago→conciliación→estado de cuenta con sus validaciones (anticipo con CREDITO rechazado, cheque sin número rechazado, conciliación que excede el saldo disponible rechazada, conciliación sin recepción ni pago rechazada), y venta de pergamino comprado directo con descuento real de inventario (100kg → 40kg tras vender 60kg), rechazando suma de lotes que no cuadra y cantidad que excede el stock disponible.
 
 ### Pendiente (scaffold vacío — controller/service/module creados pero SIN lógica de negocio)
-- `ventas` — venta de café procesado (consume el inventario de PERGAMINO/ALMENDRA/PASILLA que ya genera Bodega) ⬅ **candidato a seguir**
-- `facturacion` — adaptador DIAN (Factus/Siigo, decisión de proveedor diferida)
+- `facturacion` — adaptador DIAN (Factus/Siigo, decisión de proveedor diferida) ⬅ **candidato a seguir**
 - `reportes` — dashboard y KPIs
 
 ## Frontend (`apps/web` — Next.js)
@@ -118,7 +124,13 @@ Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, r
   - `app/(dashboard)/pagos/anticipos/[id]/page.tsx` — detalle del anticipo (monto/conciliado/saldo disponible) con formulario de conciliación inline (contra recepción o contra pago del mismo proveedor, con `max` del input acotado al saldo disponible); se oculta el formulario cuando el saldo llega a cero.
   - `app/(dashboard)/pagos/cuenta/page.tsx` — selector de proveedor + tarjetas KPI con el estado de cuenta (`GET /pagos/cuenta/:id`), con nota explícita de que el saldo es estimado/informativo, no autoritativo.
 - **Panel de super-admin** (`app/platform/*`) y **Configuración del tenant** (`app/(dashboard)/configuracion/*`) — ver detalle completo en la sección "Plan/límites por tenant + panel de super-admin" más arriba.
-- `packages/shared-types` ampliado con `PuntoCompra`, `DefectoTipo`, `TablaPrecioTramo`, `AnalisisCalidad`, `DefectoAnalisis`, `Recepcion`, `CategoriaDefecto`, `EstadoProcesoSecado`, `InventarioItem`, `ProcesoSecado`, `TrillaProceso`, `Anticipo`, `AnticipoDetalle`, `Pago`, `ConciliacionAnticipo`, `EstadoCuentaProveedor`, `EstadoTenant`, `Plan`, `PlatformTenant`, `Role`, `RolePermissionEntry`, `User`, `UserRoleAssignment`, `TenantSelf`.
+- **Módulo Ventas completo**:
+  - `app/(dashboard)/ventas/page.tsx` — listado con montos formateados en COP.
+  - `app/(dashboard)/ventas/nueva/page.tsx` — formulario con select de punto de compra + tipo de café (con stock disponible en vivo desde `/bodega/inventario`), comprador guardado opcional (autocompleta el nombre libre) o nombre escrito a mano, y un constructor de "lotes de origen" (selecciona recepciones del punto de compra elegido y les atribuye kg, con la suma en vivo vs. la cantidad total vendida).
+  - `app/(dashboard)/ventas/[id]/page.tsx` — detalle de solo lectura con lotes de origen.
+  - `app/(dashboard)/ventas/compradores/page.tsx` — alta y listado de compradores, activar/desactivar (mismo patrón que puntos de compra).
+  - Nuevo ítem de navegación "Ventas" en el layout del dashboard.
+- `packages/shared-types` ampliado con `PuntoCompra`, `DefectoTipo`, `TablaPrecioTramo`, `AnalisisCalidad`, `DefectoAnalisis`, `Recepcion`, `CategoriaDefecto`, `EstadoProcesoSecado`, `InventarioItem`, `ProcesoSecado`, `TrillaProceso`, `Anticipo`, `AnticipoDetalle`, `Pago`, `ConciliacionAnticipo`, `EstadoCuentaProveedor`, `EstadoTenant`, `Plan`, `PlatformTenant`, `Role`, `RolePermissionEntry`, `User`, `UserRoleAssignment`, `TenantSelf`, `Comprador`, `Venta`, `VentaLoteOrigenItem`.
 
 ### Pendiente
 - Páginas de dashboard aún placeholder: facturación, reportes.
@@ -128,6 +140,7 @@ Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, r
 - Recepción: no hay impresión/PDF del recibo, ni edición/anulación de una recepción ya creada (ver nota de alcance en la sección de backend).
 - Bodega/secado "nuevo": la lista de recepciones mojado disponibles no excluye del todo las que ya fueron usadas en otro proceso (el backend sí lo valida y rechaza con mensaje claro, pero la UI no las oculta de antemano).
 - Pagos: no hay página de detalle de un pago individual (la lista ya muestra proveedor/recepción/método/monto, que cubre el caso de uso principal); tampoco hay filtros de fecha/proveedor en la UI de listados (el backend sí los soporta vía query params).
+- Ventas: el selector de "lotes de origen" en `/ventas/nueva` lista todas las recepciones del punto de compra sin filtrar por tipo de café ni excluir las agotadas (la trazabilidad es informativa por diseño, ver nota de alcance en la sección de backend, pero la UI podría guiar mejor la selección). Tampoco hay reporte de rentabilidad por lote todavía — eso es trabajo de `reportes`.
 
 ## Cómo levantar el entorno de desarrollo
 
@@ -144,5 +157,5 @@ Para crear el primer tenant de prueba: entrar a `/platform/login` con `PLATFORM_
 
 1. Leer este archivo.
 2. Si hay dudas de diseño, revisar `docs/requerimientos.md`.
-3. Siguiente módulo recomendado: **Ventas** — registro simple de venta de café procesado (comprador, cantidad, precio, lotes/recepciones de origen), consume el inventario agregado de PERGAMINO/ALMENDRA/PASILLA que ya genera Bodega (no lote por lote exacto, pero conserva referencia a los lotes de origen — ver `requerimientos.md`: "Ventas (detalle)"). Sin factura electrónica ni control de método de pago todavía (eso es `facturacion`, que sigue después). El modelo `Venta`/`VentaLoteOrigen` ya está en el schema. Seguir el mismo patrón que Proveedores/Recepción/Bodega/Pagos: DTOs con class-validator, service con `@InjectTenantPrisma`, `tenantId` explícito en creates, controller con `@RequirePermissions`, y siempre probar con curl (crear tenant de prueba → login → CRUD) antes de dar el backend por terminado. Revisar `getStockDisponible` en `bodega.service.ts` como referencia para descontar inventario al vender.
+3. Siguiente módulo recomendado: **Facturación electrónica (DIAN)** — adaptador abstracto (decisión de proveedor Factus/Siigo diferida, ver `requerimientos.md`), 1 factura por recepción/lote. El modelo `Factura`/`ResolucionFacturacion` ya está en el schema (`ProveedorTecnologicoFacturacion` enum con `NINGUNO` como default, para poder emitir "en blanco" mientras no hay proveedor conectado). Alternativa igual de válida: **Reportes** — dashboard con los KPIs ya definidos (compras por período, saldo pendiente a proveedores usando `/pagos/cuenta`, inventario actual usando `/bodega/inventario`, calidad promedio comprada) y ahora que Ventas existe, rentabilidad por lote (comparar `Recepcion.valorTotal` contra `VentaLoteOrigen.cantidadKgAtribuida` × `Venta.precioKg` de las ventas que referencian esa recepción). Seguir el mismo patrón que los módulos anteriores: DTOs con class-validator, service con `@InjectTenantPrisma`, `tenantId` explícito en creates, controller con `@RequirePermissions`, y siempre probar con curl (crear tenant de prueba → login → CRUD) antes de dar el backend por terminado.
 4. Al terminar una sesión de trabajo, actualizar este archivo.
