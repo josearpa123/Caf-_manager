@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { Permission } from '@prisma/client';
 import { PuntosCompraService } from './puntos-compra.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreatePuntoCompraDto } from './dto/create-punto-compra.dto';
 import { UpdatePuntoCompraDto } from './dto/update-punto-compra.dto';
 
@@ -23,8 +24,11 @@ export class PuntosCompraController {
 
   @RequirePermissions(Permission.PUNTOS_COMPRA_GESTIONAR)
   @Post()
-  create(@Body() dto: CreatePuntoCompraDto) {
-    return this.puntosCompraService.create(dto);
+  create(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: CreatePuntoCompraDto,
+  ) {
+    return this.puntosCompraService.create(tenantId, dto);
   }
 
   @RequirePermissions(Permission.PUNTOS_COMPRA_GESTIONAR)

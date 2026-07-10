@@ -1,14 +1,8 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { Permission } from '@prisma/client';
 import { UsersService } from './users.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AssignRolesDto } from './dto/assign-roles.dto';
@@ -31,8 +25,11 @@ export class UsersController {
 
   @RequirePermissions(Permission.USUARIOS_GESTIONAR)
   @Post()
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
+  create(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: CreateUserDto,
+  ) {
+    return this.usersService.create(tenantId, dto);
   }
 
   @RequirePermissions(Permission.USUARIOS_GESTIONAR)

@@ -5,22 +5,35 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
-import { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
+import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AssignRolesDto } from './dto/assign-roles.dto';
 
-const USER_WITH_ROLES_INCLUDE = {
+// select explícito (no include) para nunca devolver passwordHash al cliente.
+const USER_SAFE_SELECT = {
+  id: true,
+  tenantId: true,
+  email: true,
+  nombre: true,
+  telefono: true,
+  puntoCompraId: true,
+  activo: true,
+  lastLoginAt: true,
+  createdAt: true,
+  updatedAt: true,
   roles: { include: { role: true } },
 } as const;
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectTenantPrisma() private readonly prisma: TenantPrismaClient) {}
+  constructor(
+    @InjectTenantPrisma() private readonly prisma: TenantPrismaClient,
+  ) {}
 
   findAll() {
     return this.prisma.user.findMany({
-      include: USER_WITH_ROLES_INCLUDE,
+      select: USER_SAFE_SELECT,
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -28,7 +41,7 @@ export class UsersService {
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: USER_WITH_ROLES_INCLUDE,
+      select: USER_SAFE_SELECT,
     });
     if (!user) throw new NotFoundException('Usuario no encontrado');
     return user;
@@ -58,7 +71,7 @@ export class UsersService {
     }
   }
 
-  async create(dto: CreateUserDto) {
+  async create(tenantId: string, dto: CreateUserDto) {
     await this.assertRolesBelongToTenant(dto.roleIds);
     if (dto.puntoCompraId) {
       await this.assertPuntoCompraBelongsToTenant(dto.puntoCompraId);
@@ -69,6 +82,7 @@ export class UsersService {
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
+          tenantId,
           email: dto.email,
           nombre: dto.nombre,
           telefono: dto.telefono,
@@ -83,7 +97,7 @@ export class UsersService {
 
       return tx.user.findUniqueOrThrow({
         where: { id: user.id },
-        include: USER_WITH_ROLES_INCLUDE,
+        select: USER_SAFE_SELECT,
       });
     });
   }
@@ -101,7 +115,7 @@ export class UsersService {
         puntoCompraId: dto.puntoCompraId,
         activo: dto.activo,
       },
-      include: USER_WITH_ROLES_INCLUDE,
+      select: USER_SAFE_SELECT,
     });
   }
 
@@ -116,7 +130,7 @@ export class UsersService {
       });
       return tx.user.findUniqueOrThrow({
         where: { id },
-        include: USER_WITH_ROLES_INCLUDE,
+        select: USER_SAFE_SELECT,
       });
     });
   }

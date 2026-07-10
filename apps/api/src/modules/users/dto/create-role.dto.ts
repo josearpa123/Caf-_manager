@@ -1,4 +1,10 @@
-import { IsArray, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import { Permission } from '@prisma/client';
 
 export class CreateRoleDto {

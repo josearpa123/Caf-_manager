@@ -2,6 +2,16 @@
 // manualmente con los enums equivalentes en apps/api/prisma/schema.prisma —
 // el frontend no puede importar el Prisma Client generado directamente.
 
+export const TipoIdentificacion = {
+  CC: 'CC',
+  NIT: 'NIT',
+  CE: 'CE',
+  TI: 'TI',
+  PASAPORTE: 'PASAPORTE',
+} as const;
+export type TipoIdentificacion =
+  (typeof TipoIdentificacion)[keyof typeof TipoIdentificacion];
+
 export const TipoCafeRecepcion = {
   MOJADO: 'MOJADO',
   PASILLA: 'PASILLA',
@@ -101,3 +111,21 @@ export const Permission = {
   AUDITORIA_VER: 'AUDITORIA_VER',
 } as const;
 export type Permission = (typeof Permission)[keyof typeof Permission];
+
+export interface Proveedor {
+  id: string;
+  tenantId: string;
+  tipoIdentificacion: TipoIdentificacion;
+  numeroIdentificacion: string;
+  nombre: string;
+  telefono: string | null;
+  whatsapp: string | null;
+  vereda: string | null;
+  municipio: string | null;
+  departamento: string | null;
+  activo: boolean;
+  notas: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+}

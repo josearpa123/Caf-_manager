@@ -1,5 +1,9 @@
 import { Prisma } from '@prisma/client';
-import { READ_OPS, TENANT_SCOPED_MODELS, WHERE_WRITE_OPS } from './scoped-models';
+import {
+  READ_OPS,
+  TENANT_SCOPED_MODELS,
+  WHERE_WRITE_OPS,
+} from './scoped-models';
 
 // Intercepta TODAS las queries de Prisma e inyecta automáticamente el filtro
 // de tenant, para que ningún módulo de negocio tenga que acordarse de

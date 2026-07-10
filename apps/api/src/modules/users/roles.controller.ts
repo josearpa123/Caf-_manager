@@ -10,6 +10,7 @@ import {
 import { Permission } from '@prisma/client';
 import { RolesService } from './roles.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { SetRolePermissionsDto } from './dto/set-role-permissions.dto';
@@ -32,8 +33,11 @@ export class RolesController {
 
   @RequirePermissions(Permission.ROLES_GESTIONAR)
   @Post()
-  create(@Body() dto: CreateRoleDto) {
-    return this.rolesService.create(dto);
+  create(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: CreateRoleDto,
+  ) {
+    return this.rolesService.create(tenantId, dto);
   }
 
   @RequirePermissions(Permission.ROLES_GESTIONAR)
@@ -44,8 +48,12 @@ export class RolesController {
 
   @RequirePermissions(Permission.ROLES_GESTIONAR)
   @Patch(':id/permissions')
-  setPermissions(@Param('id') id: string, @Body() dto: SetRolePermissionsDto) {
-    return this.rolesService.setPermissions(id, dto);
+  setPermissions(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: SetRolePermissionsDto,
+  ) {
+    return this.rolesService.setPermissions(tenantId, id, dto);
   }
 
   @RequirePermissions(Permission.ROLES_GESTIONAR)

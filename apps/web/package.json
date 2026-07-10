@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@coffee-manager/shared-types": "workspace:*",
+    "@coffee-manager/validation-schemas": "workspace:*",
     "react": "^18",
     "react-dom": "^18",
     "next": "14.2.35",

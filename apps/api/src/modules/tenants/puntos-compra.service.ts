@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
-import { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
+import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { CreatePuntoCompraDto } from './dto/create-punto-compra.dto';
 import { UpdatePuntoCompraDto } from './dto/update-punto-compra.dto';
 
 @Injectable()
 export class PuntosCompraService {
-  constructor(@InjectTenantPrisma() private readonly prisma: TenantPrismaClient) {}
+  constructor(
+    @InjectTenantPrisma() private readonly prisma: TenantPrismaClient,
+  ) {}
 
   findAll() {
     return this.prisma.puntoCompra.findMany({ orderBy: { nombre: 'asc' } });
@@ -18,8 +20,8 @@ export class PuntosCompraService {
     return punto;
   }
 
-  create(dto: CreatePuntoCompraDto) {
-    return this.prisma.puntoCompra.create({ data: dto });
+  create(tenantId: string, dto: CreatePuntoCompraDto) {
+    return this.prisma.puntoCompra.create({ data: { tenantId, ...dto } });
   }
 
   async update(id: string, dto: UpdatePuntoCompraDto) {

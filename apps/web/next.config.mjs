@@ -1,4 +1,9 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  transpilePackages: [
+    '@coffee-manager/shared-types',
+    '@coffee-manager/validation-schemas',
+  ],
+};
 
 export default nextConfig;

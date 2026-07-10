@@ -24,13 +24,17 @@ export class PermissionsGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const user = request.user as AuthenticatedUser | undefined;
     if (!isAuthenticatedUser(user)) {
-      throw new ForbiddenException('No tienes permisos suficientes para esta acción');
+      throw new ForbiddenException(
+        'No tienes permisos suficientes para esta acción',
+      );
     }
 
     const granted = new Set(user.permissions);
     const ok = required.every((permission) => granted.has(permission));
     if (!ok) {
-      throw new ForbiddenException('No tienes permisos suficientes para esta acción');
+      throw new ForbiddenException(
+        'No tienes permisos suficientes para esta acción',
+      );
     }
     return true;
   }
