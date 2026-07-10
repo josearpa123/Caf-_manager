@@ -5,6 +5,16 @@ import Link from 'next/link';
 import type { Pago } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
 import { buttonVariants } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 function formatMoney(value: string) {
   return new Intl.NumberFormat('es-CO', {
@@ -53,50 +63,40 @@ export default function PagosPage() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-6 overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Fecha</th>
-              <th className="px-4 py-2 font-medium">Proveedor</th>
-              <th className="px-4 py-2 font-medium">Recepción</th>
-              <th className="px-4 py-2 font-medium">Método</th>
-              <th className="px-4 py-2 font-medium">Monto</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && pagos.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay pagos registrados.
-                </td>
-              </tr>
-            )}
-            {pagos.map((p) => (
-              <tr key={p.id} className="border-t">
-                <td className="px-4 py-2 text-muted-foreground">
-                  {new Date(p.fecha).toLocaleDateString('es-CO')}
-                </td>
-                <td className="px-4 py-2">{p.proveedor.nombre}</td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {p.recepcion?.codigo ?? '—'}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
+      <Table className="mt-6">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Fecha</TableHead>
+            <TableHead>Proveedor</TableHead>
+            <TableHead>Recepción</TableHead>
+            <TableHead>Método</TableHead>
+            <TableHead>Monto</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={5}>Cargando…</TableEmpty>}
+          {!isLoading && pagos.length === 0 && (
+            <TableEmpty colSpan={5}>No hay pagos registrados.</TableEmpty>
+          )}
+          {pagos.map((p) => (
+            <TableRow key={p.id}>
+              <TableCell className="text-muted-foreground">
+                {new Date(p.fecha).toLocaleDateString('es-CO')}
+              </TableCell>
+              <TableCell>{p.proveedor.nombre}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {p.recepcion?.codigo ?? '—'}
+              </TableCell>
+              <TableCell>
+                <Badge variant={p.metodoPago === 'CREDITO' ? 'warning' : 'neutral'}>
                   {METODO_LABEL[p.metodoPago] ?? p.metodoPago}
-                </td>
-                <td className="px-4 py-2 font-medium">{formatMoney(p.monto)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </Badge>
+              </TableCell>
+              <TableCell className="font-medium tabular-nums">{formatMoney(p.monto)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

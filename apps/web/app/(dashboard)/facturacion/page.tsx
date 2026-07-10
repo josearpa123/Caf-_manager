@@ -2,9 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Info } from 'lucide-react';
 import type { Factura } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
 import { buttonVariants } from '@/components/ui/button';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 function formatMoney(value: string) {
   return new Intl.NumberFormat('es-CO', {
@@ -19,6 +30,13 @@ const ESTADO_LABEL: Record<string, string> = {
   EMITIDA: 'Emitida',
   ANULADA: 'Anulada',
   ERROR: 'Error',
+};
+
+const ESTADO_VARIANT: Record<string, NonNullable<BadgeProps['variant']>> = {
+  PENDIENTE: 'neutral',
+  EMITIDA: 'success',
+  ANULADA: 'outline',
+  ERROR: 'destructive',
 };
 
 export default function FacturacionPage() {
@@ -44,58 +62,53 @@ export default function FacturacionPage() {
           Generar factura
         </Link>
       </div>
-      <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-        No hay un proveedor tecnológico conectado todavía (Factus/Siigo, decisión pendiente). Se
-        puede dejar el registro de la factura listo, pero la emisión real ante la DIAN fallará
-        con un mensaje claro hasta que se conecte un proveedor.
-      </p>
+      <div className="mt-4 flex max-w-2xl items-start gap-2.5 rounded-lg border border-warning/30 bg-warning/10 px-3.5 py-3 text-sm">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+        <p className="text-foreground/80">
+          No hay un proveedor tecnológico conectado todavía (Factus/Siigo, decisión pendiente). Se
+          puede dejar el registro de la factura listo, pero la emisión real ante la DIAN fallará
+          con un mensaje claro hasta que se conecte un proveedor.
+        </p>
+      </div>
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-6 overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Recepción</th>
-              <th className="px-4 py-2 font-medium">Proveedor</th>
-              <th className="px-4 py-2 font-medium">Punto de compra</th>
-              <th className="px-4 py-2 font-medium">Valor</th>
-              <th className="px-4 py-2 font-medium">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && facturas.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay facturas registradas.
-                </td>
-              </tr>
-            )}
-            {facturas.map((f) => (
-              <tr key={f.id} className="border-t">
-                <td className="px-4 py-2">
-                  <Link href={`/facturacion/${f.id}`} className="font-medium hover:underline">
-                    {f.recepcion.codigo}
-                  </Link>
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">{f.recepcion.proveedor.nombre}</td>
-                <td className="px-4 py-2 text-muted-foreground">{f.puntoCompra.nombre}</td>
-                <td className="px-4 py-2 font-medium">{formatMoney(f.recepcion.valorTotal)}</td>
-                <td className="px-4 py-2 text-muted-foreground">
+      <Table className="mt-6">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Recepción</TableHead>
+            <TableHead>Proveedor</TableHead>
+            <TableHead>Punto de compra</TableHead>
+            <TableHead>Valor</TableHead>
+            <TableHead>Estado</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={5}>Cargando…</TableEmpty>}
+          {!isLoading && facturas.length === 0 && (
+            <TableEmpty colSpan={5}>No hay facturas registradas.</TableEmpty>
+          )}
+          {facturas.map((f) => (
+            <TableRow key={f.id}>
+              <TableCell>
+                <Link href={`/facturacion/${f.id}`} className="font-medium hover:underline">
+                  {f.recepcion.codigo}
+                </Link>
+              </TableCell>
+              <TableCell className="text-muted-foreground">{f.recepcion.proveedor.nombre}</TableCell>
+              <TableCell className="text-muted-foreground">{f.puntoCompra.nombre}</TableCell>
+              <TableCell className="font-medium tabular-nums">
+                {formatMoney(f.recepcion.valorTotal)}
+              </TableCell>
+              <TableCell>
+                <Badge variant={ESTADO_VARIANT[f.estado] ?? 'neutral'}>
                   {ESTADO_LABEL[f.estado] ?? f.estado}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </Badge>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

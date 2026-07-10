@@ -6,11 +6,27 @@ import type { EstadoTenant, Plan, PlatformTenant } from '@coffee-manager/shared-
 import { platformApi, ApiError } from '@/lib/platform-api';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 const ESTADO_LABEL: Record<string, string> = {
   ACTIVO: 'Activo',
   SUSPENDIDO: 'Suspendido',
   PRUEBA: 'Prueba',
+};
+
+const ESTADO_VARIANT: Record<string, NonNullable<BadgeProps['variant']>> = {
+  ACTIVO: 'success',
+  SUSPENDIDO: 'destructive',
+  PRUEBA: 'warning',
 };
 
 export default function PlatformDashboardPage() {
@@ -73,90 +89,82 @@ export default function PlatformDashboardPage() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-6 overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Nombre</th>
-              <th className="px-4 py-2 font-medium">Estado</th>
-              <th className="px-4 py-2 font-medium">Plan</th>
-              <th className="px-4 py-2 font-medium">Usuarios</th>
-              <th className="px-4 py-2 font-medium">Puntos de compra</th>
-              <th className="px-4 py-2 font-medium">Creado</th>
-              <th className="px-4 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && tenants.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay tenants todavía.
-                </td>
-              </tr>
-            )}
-            {tenants.map((t) => (
-              <tr key={t.id} className="border-t">
-                <td className="px-4 py-2 font-medium">{t.nombre}</td>
-                <td className="px-4 py-2 text-muted-foreground">{ESTADO_LABEL[t.estado]}</td>
-                <td className="px-4 py-2">
-                  <Select
-                    value={t.plan?.id ?? ''}
-                    onChange={(e) => cambiarPlan(t.id, e.target.value)}
+      <Table className="mt-6">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead>Plan</TableHead>
+            <TableHead>Usuarios</TableHead>
+            <TableHead>Puntos de compra</TableHead>
+            <TableHead>Creado</TableHead>
+            <TableHead />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={7}>Cargando…</TableEmpty>}
+          {!isLoading && tenants.length === 0 && (
+            <TableEmpty colSpan={7}>No hay tenants todavía.</TableEmpty>
+          )}
+          {tenants.map((t) => (
+            <TableRow key={t.id}>
+              <TableCell className="font-medium">{t.nombre}</TableCell>
+              <TableCell>
+                <Badge variant={ESTADO_VARIANT[t.estado] ?? 'neutral'} dot>
+                  {ESTADO_LABEL[t.estado]}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Select
+                  value={t.plan?.id ?? ''}
+                  onChange={(e) => cambiarPlan(t.id, e.target.value)}
+                  disabled={updatingId === t.id}
+                  className="h-8 max-w-[160px] text-xs"
+                >
+                  <option value="">Sin plan (sin límite)</option>
+                  {planes.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </Select>
+              </TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {t._count.users}
+                {t.plan ? ` / ${t.plan.maxUsuarios}` : ''}
+              </TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {t._count.puntosCompra}
+                {t.plan?.maxPuntosCompra ? ` / ${t.plan.maxPuntosCompra}` : ''}
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {new Date(t.createdAt).toLocaleDateString('es-CO')}
+              </TableCell>
+              <TableCell className="text-right">
+                {t.estado === 'SUSPENDIDO' ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
                     disabled={updatingId === t.id}
-                    className="h-8 max-w-[160px] text-xs"
+                    onClick={() => cambiarEstado(t.id, 'ACTIVO')}
                   >
-                    <option value="">Sin plan (sin límite)</option>
-                    {planes.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombre}
-                      </option>
-                    ))}
-                  </Select>
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {t._count.users}
-                  {t.plan ? ` / ${t.plan.maxUsuarios}` : ''}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {t._count.puntosCompra}
-                  {t.plan?.maxPuntosCompra ? ` / ${t.plan.maxPuntosCompra}` : ''}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {new Date(t.createdAt).toLocaleDateString('es-CO')}
-                </td>
-                <td className="px-4 py-2 text-right">
-                  {t.estado === 'SUSPENDIDO' ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={updatingId === t.id}
-                      onClick={() => cambiarEstado(t.id, 'ACTIVO')}
-                    >
-                      Activar
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={updatingId === t.id}
-                      onClick={() => cambiarEstado(t.id, 'SUSPENDIDO')}
-                    >
-                      Suspender
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                    Activar
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={updatingId === t.id}
+                    onClick={() => cambiarEstado(t.id, 'SUSPENDIDO')}
+                  >
+                    Suspender
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

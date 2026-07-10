@@ -7,6 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export default function TrillaPage() {
   const [puntosCompra, setPuntosCompra] = useState<PuntoCompra[]>([]);
@@ -147,46 +156,38 @@ export default function TrillaPage() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-8 max-w-2xl overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Código</th>
-              <th className="px-4 py-2 font-medium">Punto de compra</th>
-              <th className="px-4 py-2 font-medium">Pergamino</th>
-              <th className="px-4 py-2 font-medium">Almendra</th>
-              <th className="px-4 py-2 font-medium">Rendimiento</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && trillas.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay procesos de trilla registrados.
-                </td>
-              </tr>
-            )}
-            {trillas.map((t) => (
-              <tr key={t.id} className="border-t">
-                <td className="px-4 py-2 font-medium">{t.codigo}</td>
-                <td className="px-4 py-2 text-muted-foreground">{t.puntoCompra.nombre}</td>
-                <td className="px-4 py-2 text-muted-foreground">{Number(t.pesoPergaminoKg)} kg</td>
-                <td className="px-4 py-2 text-muted-foreground">{Number(t.pesoAlmendraKg)} kg</td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {Number(t.rendimientoPorcentaje)}%
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table className="mt-8 max-w-2xl">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Código</TableHead>
+            <TableHead>Punto de compra</TableHead>
+            <TableHead>Pergamino</TableHead>
+            <TableHead>Almendra</TableHead>
+            <TableHead>Rendimiento</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={5}>Cargando…</TableEmpty>}
+          {!isLoading && trillas.length === 0 && (
+            <TableEmpty colSpan={5}>No hay procesos de trilla registrados.</TableEmpty>
+          )}
+          {trillas.map((t) => (
+            <TableRow key={t.id}>
+              <TableCell className="font-medium">{t.codigo}</TableCell>
+              <TableCell className="text-muted-foreground">{t.puntoCompra.nombre}</TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {Number(t.pesoPergaminoKg)} kg
+              </TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {Number(t.pesoAlmendraKg)} kg
+              </TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {Number(t.rendimientoPorcentaje)}%
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

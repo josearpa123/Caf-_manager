@@ -5,6 +5,15 @@ import Link from 'next/link';
 import type { Anticipo } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
 import { buttonVariants } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 function formatMoney(value: string) {
   return new Intl.NumberFormat('es-CO', {
@@ -45,48 +54,36 @@ export default function AnticiposPage() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-6 overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Fecha</th>
-              <th className="px-4 py-2 font-medium">Proveedor</th>
-              <th className="px-4 py-2 font-medium">Punto de compra</th>
-              <th className="px-4 py-2 font-medium">Monto</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && anticipos.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay anticipos registrados.
-                </td>
-              </tr>
-            )}
-            {anticipos.map((a) => (
-              <tr key={a.id} className="border-t">
-                <td className="px-4 py-2 text-muted-foreground">
-                  {new Date(a.fecha).toLocaleDateString('es-CO')}
-                </td>
-                <td className="px-4 py-2">
-                  <Link href={`/pagos/anticipos/${a.id}`} className="font-medium hover:underline">
-                    {a.proveedor.nombre}
-                  </Link>
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">{a.puntoCompra.nombre}</td>
-                <td className="px-4 py-2 font-medium">{formatMoney(a.monto)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table className="mt-6">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Fecha</TableHead>
+            <TableHead>Proveedor</TableHead>
+            <TableHead>Punto de compra</TableHead>
+            <TableHead>Monto</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={4}>Cargando…</TableEmpty>}
+          {!isLoading && anticipos.length === 0 && (
+            <TableEmpty colSpan={4}>No hay anticipos registrados.</TableEmpty>
+          )}
+          {anticipos.map((a) => (
+            <TableRow key={a.id}>
+              <TableCell className="text-muted-foreground">
+                {new Date(a.fecha).toLocaleDateString('es-CO')}
+              </TableCell>
+              <TableCell>
+                <Link href={`/pagos/anticipos/${a.id}`} className="font-medium hover:underline">
+                  {a.proveedor.nombre}
+                </Link>
+              </TableCell>
+              <TableCell className="text-muted-foreground">{a.puntoCompra.nombre}</TableCell>
+              <TableCell className="font-medium tabular-nums">{formatMoney(a.monto)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

@@ -5,6 +5,17 @@ import Link from 'next/link';
 import type { InventarioItem, Recepcion } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { tipoCafeVariant } from '@/lib/badge-variants';
 
 export default function BodegaPage() {
   const [inventario, setInventario] = useState<InventarioItem[]>([]);
@@ -61,93 +72,81 @@ export default function BodegaPage() {
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
       <h2 className="mt-8 text-lg font-medium">Inventario actual</h2>
-      <div className="mt-3 max-w-2xl overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Punto de compra</th>
-              <th className="px-4 py-2 font-medium">Tipo de café</th>
-              <th className="px-4 py-2 font-medium">Cantidad</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && inventario.length === 0 && (
-              <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
-                  Sin existencias registradas.
-                </td>
-              </tr>
-            )}
-            {inventario.map((item) => (
-              <tr key={`${item.puntoCompraId}-${item.tipoCafe}`} className="border-t">
-                <td className="px-4 py-2">{item.puntoCompraNombre}</td>
-                <td className="px-4 py-2 text-muted-foreground">{item.tipoCafe}</td>
-                <td className="px-4 py-2 font-medium">{item.cantidadKg.toFixed(2)} kg</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table className="mt-3 max-w-2xl">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Punto de compra</TableHead>
+            <TableHead>Tipo de café</TableHead>
+            <TableHead>Cantidad</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={3}>Cargando…</TableEmpty>}
+          {!isLoading && inventario.length === 0 && (
+            <TableEmpty colSpan={3}>Sin existencias registradas.</TableEmpty>
+          )}
+          {inventario.map((item) => (
+            <TableRow key={`${item.puntoCompraId}-${item.tipoCafe}`}>
+              <TableCell>{item.puntoCompraNombre}</TableCell>
+              <TableCell>
+                <Badge variant={tipoCafeVariant(item.tipoCafe)}>{item.tipoCafe}</Badge>
+              </TableCell>
+              <TableCell className="font-medium tabular-nums">
+                {item.cantidadKg.toFixed(2)} kg
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
 
       <h2 className="mt-8 text-lg font-medium">Pasilla pendiente de destino</h2>
       <p className="text-sm text-muted-foreground">
         Cada recepción de pasilla debe destinarse a mezcla con pergamino o a venta separada.
       </p>
-      <div className="mt-3 max-w-2xl overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Código</th>
-              <th className="px-4 py-2 font-medium">Proveedor</th>
-              <th className="px-4 py-2 font-medium">Peso neto</th>
-              <th className="px-4 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {!isLoading && pasillasPendientes.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay pasillas pendientes.
-                </td>
-              </tr>
-            )}
-            {pasillasPendientes.map((p) => (
-              <tr key={p.id} className="border-t">
-                <td className="px-4 py-2">{p.codigo}</td>
-                <td className="px-4 py-2 text-muted-foreground">{p.proveedor.nombre}</td>
-                <td className="px-4 py-2 text-muted-foreground">{Number(p.pesoNeto)} kg</td>
-                <td className="px-4 py-2 text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={decidiendo === p.id}
-                      onClick={() => decidir(p.id, 'MEZCLA')}
-                    >
-                      Mezclar con pergamino
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={decidiendo === p.id}
-                      onClick={() => decidir(p.id, 'VENTA_SEPARADA')}
-                    >
-                      Vender separada
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table className="mt-3 max-w-2xl">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Código</TableHead>
+            <TableHead>Proveedor</TableHead>
+            <TableHead>Peso neto</TableHead>
+            <TableHead />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {!isLoading && pasillasPendientes.length === 0 && (
+            <TableEmpty colSpan={4}>No hay pasillas pendientes.</TableEmpty>
+          )}
+          {pasillasPendientes.map((p) => (
+            <TableRow key={p.id}>
+              <TableCell>{p.codigo}</TableCell>
+              <TableCell className="text-muted-foreground">{p.proveedor.nombre}</TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {Number(p.pesoNeto)} kg
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={decidiendo === p.id}
+                    onClick={() => decidir(p.id, 'MEZCLA')}
+                  >
+                    Mezclar con pergamino
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={decidiendo === p.id}
+                    onClick={() => decidir(p.id, 'VENTA_SEPARADA')}
+                  >
+                    Vender separada
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Download } from 'lucide-react';
 import type { PuntoCompra, ReportesDashboard } from '@coffee-manager/shared-types';
 import { api, ApiError, getToken } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { tipoCafeVariant } from '@/lib/badge-variants';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -94,6 +106,7 @@ export default function ReportesPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Reportes</h1>
         <Button variant="outline" onClick={exportarCsv} disabled={isExporting}>
+          <Download className="h-4 w-4" />
           {isExporting ? 'Exportando…' : 'Exportar compras (CSV)'}
         </Button>
       </div>
@@ -140,38 +153,46 @@ export default function ReportesPage() {
           </div>
 
           <div className="mt-4 grid max-w-3xl grid-cols-2 gap-4">
-            <div className="rounded-md border p-4">
-              <p className="text-sm font-medium">Compras por tipo</p>
-              <ul className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground">
-                {data.compras.porTipo.length === 0 && <li>Sin datos en el período.</li>}
-                {data.compras.porTipo.map((c) => (
-                  <li key={c.tipoCafe} className="flex justify-between">
-                    <span>
-                      {c.tipoCafe} ({c.cantidad})
-                    </span>
-                    <span>
-                      {c.kg.toFixed(2)} kg — {formatMoney(c.valor)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="rounded-md border p-4">
-              <p className="text-sm font-medium">Ventas por tipo</p>
-              <ul className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground">
-                {data.ventas.porTipo.length === 0 && <li>Sin datos en el período.</li>}
-                {data.ventas.porTipo.map((v) => (
-                  <li key={v.tipoCafe} className="flex justify-between">
-                    <span>
-                      {v.tipoCafe} ({v.cantidad})
-                    </span>
-                    <span>
-                      {v.kg.toFixed(2)} kg — {formatMoney(v.valor)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm font-medium">Compras por tipo</p>
+                <ul className="mt-3 flex flex-col gap-2 text-sm">
+                  {data.compras.porTipo.length === 0 && (
+                    <li className="text-muted-foreground">Sin datos en el período.</li>
+                  )}
+                  {data.compras.porTipo.map((c) => (
+                    <li key={c.tipoCafe} className="flex items-center justify-between">
+                      <Badge variant={tipoCafeVariant(c.tipoCafe)}>
+                        {c.tipoCafe} · {c.cantidad}
+                      </Badge>
+                      <span className="tabular-nums text-muted-foreground">
+                        {c.kg.toFixed(2)} kg — {formatMoney(c.valor)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm font-medium">Ventas por tipo</p>
+                <ul className="mt-3 flex flex-col gap-2 text-sm">
+                  {data.ventas.porTipo.length === 0 && (
+                    <li className="text-muted-foreground">Sin datos en el período.</li>
+                  )}
+                  {data.ventas.porTipo.map((v) => (
+                    <li key={v.tipoCafe} className="flex items-center justify-between">
+                      <Badge variant={tipoCafeVariant(v.tipoCafe)}>
+                        {v.tipoCafe} · {v.cantidad}
+                      </Badge>
+                      <span className="tabular-nums text-muted-foreground">
+                        {v.kg.toFixed(2)} kg — {formatMoney(v.valor)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
           </div>
 
           <h2 className="mt-8 text-lg font-medium">Calidad promedio comprada (pergamino)</h2>
@@ -199,72 +220,64 @@ export default function ReportesPage() {
           </div>
 
           <h2 className="mt-8 text-lg font-medium">Inventario actual</h2>
-          <div className="mt-3 max-w-2xl overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-secondary/50 text-left text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2 font-medium">Punto de compra</th>
-                  <th className="px-4 py-2 font-medium">Tipo de café</th>
-                  <th className="px-4 py-2 font-medium">Cantidad</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.inventario.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
-                      Sin existencias registradas.
-                    </td>
-                  </tr>
-                )}
-                {data.inventario.map((item) => (
-                  <tr key={`${item.puntoCompraId}-${item.tipoCafe}`} className="border-t">
-                    <td className="px-4 py-2">{item.puntoCompraNombre}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{item.tipoCafe}</td>
-                    <td className="px-4 py-2 font-medium">{item.cantidadKg.toFixed(2)} kg</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table className="mt-3 max-w-2xl">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Punto de compra</TableHead>
+                <TableHead>Tipo de café</TableHead>
+                <TableHead>Cantidad</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.inventario.length === 0 && (
+                <TableEmpty colSpan={3}>Sin existencias registradas.</TableEmpty>
+              )}
+              {data.inventario.map((item) => (
+                <TableRow key={`${item.puntoCompraId}-${item.tipoCafe}`}>
+                  <TableCell>{item.puntoCompraNombre}</TableCell>
+                  <TableCell>
+                    <Badge variant={tipoCafeVariant(item.tipoCafe)}>{item.tipoCafe}</Badge>
+                  </TableCell>
+                  <TableCell className="font-medium tabular-nums">
+                    {item.cantidadKg.toFixed(2)} kg
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
 
           <h2 className="mt-8 text-lg font-medium">Saldo pendiente a proveedores</h2>
           <p className="text-sm text-muted-foreground">
             Estimado a partir de compras, pagos y anticipos conciliados — no es un saldo
             autoritativo (ver estado de cuenta en Pagos).
           </p>
-          <div className="mt-3 max-w-2xl overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-secondary/50 text-left text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2 font-medium">Proveedor</th>
-                  <th className="px-4 py-2 font-medium">Saldo pendiente estimado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.saldoProveedores.proveedores.length === 0 && (
-                  <tr>
-                    <td colSpan={2} className="px-4 py-6 text-center text-muted-foreground">
-                      Sin saldos pendientes.
-                    </td>
-                  </tr>
-                )}
-                {data.saldoProveedores.proveedores.map((p) => (
-                  <tr key={p.proveedorId} className="border-t">
-                    <td className="px-4 py-2">{p.proveedorNombre}</td>
-                    <td className="px-4 py-2 font-medium">
-                      {formatMoney(p.saldoPendienteEstimado)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="border-t bg-secondary/30">
-                  <td className="px-4 py-2 font-medium">Total</td>
-                  <td className="px-4 py-2 font-medium">
-                    {formatMoney(data.saldoProveedores.totalEstimado)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <Table className="mt-3 max-w-2xl">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Proveedor</TableHead>
+                <TableHead>Saldo pendiente estimado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.saldoProveedores.proveedores.length === 0 && (
+                <TableEmpty colSpan={2}>Sin saldos pendientes.</TableEmpty>
+              )}
+              {data.saldoProveedores.proveedores.map((p) => (
+                <TableRow key={p.proveedorId}>
+                  <TableCell>{p.proveedorNombre}</TableCell>
+                  <TableCell className="font-medium tabular-nums">
+                    {formatMoney(p.saldoPendienteEstimado)}
+                  </TableCell>
+                </TableRow>
+              ))}
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                <TableCell className="font-medium">Total</TableCell>
+                <TableCell className="font-medium tabular-nums">
+                  {formatMoney(data.saldoProveedores.totalEstimado)}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </>
       )}
     </div>

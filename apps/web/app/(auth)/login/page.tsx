@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -43,10 +44,10 @@ export default function LoginPage() {
   };
 
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="w-full">
       <CardHeader>
-        <CardTitle>Coffee Manager</CardTitle>
-        <p className="text-sm text-muted-foreground">Inicia sesión para continuar</p>
+        <CardTitle>Inicia sesión</CardTitle>
+        <p className="text-sm text-muted-foreground">Ingresa tus credenciales para continuar</p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
@@ -59,9 +60,8 @@ export default function LoginPage() {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="password">Contraseña</Label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               autoComplete="current-password"
               {...register('password')}
             />
@@ -69,8 +69,12 @@ export default function LoginPage() {
               <p className="text-xs text-destructive">{errors.password.message}</p>
             )}
           </div>
-          {serverError && <p className="text-sm text-destructive">{serverError}</p>}
-          <Button type="submit" disabled={isSubmitting}>
+          {serverError && (
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {serverError}
+            </p>
+          )}
+          <Button type="submit" disabled={isSubmitting} className="mt-1">
             {isSubmitting ? 'Ingresando…' : 'Ingresar'}
           </Button>
         </form>

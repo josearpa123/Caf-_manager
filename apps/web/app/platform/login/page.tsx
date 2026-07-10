@@ -9,6 +9,7 @@ import { usePlatformAuth } from '@/lib/platform-auth';
 import { ApiError } from '@/lib/platform-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -45,7 +46,7 @@ export default function PlatformLoginPage() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <CardTitle>Coffee Manager — Plataforma</CardTitle>
+        <CardTitle>Panel de plataforma</CardTitle>
         <p className="text-sm text-muted-foreground">
           Acceso exclusivo para administradores de la plataforma
         </p>
@@ -61,9 +62,8 @@ export default function PlatformLoginPage() {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="password">Contraseña</Label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               autoComplete="current-password"
               {...register('password')}
             />
@@ -71,8 +71,12 @@ export default function PlatformLoginPage() {
               <p className="text-xs text-destructive">{errors.password.message}</p>
             )}
           </div>
-          {serverError && <p className="text-sm text-destructive">{serverError}</p>}
-          <Button type="submit" disabled={isSubmitting}>
+          {serverError && (
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {serverError}
+            </p>
+          )}
+          <Button type="submit" disabled={isSubmitting} className="mt-1">
             {isSubmitting ? 'Ingresando…' : 'Ingresar'}
           </Button>
         </form>

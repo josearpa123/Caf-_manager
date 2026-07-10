@@ -6,6 +6,7 @@ import type { Plan } from '@coffee-manager/shared-types';
 import { platformApi, ApiError } from '@/lib/platform-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 
@@ -116,9 +117,8 @@ export default function NuevoTenantPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="adminPassword">Contraseña</Label>
-              <Input
+              <PasswordInput
                 id="adminPassword"
-                type="password"
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
                 required

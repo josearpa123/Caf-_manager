@@ -6,6 +6,16 @@ import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export default function CompradoresPage() {
   const [compradores, setCompradores] = useState<Comprador[]>([]);
@@ -106,55 +116,45 @@ export default function CompradoresPage() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-6 max-w-2xl overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Nombre</th>
-              <th className="px-4 py-2 font-medium">Identificación</th>
-              <th className="px-4 py-2 font-medium">Teléfono</th>
-              <th className="px-4 py-2 font-medium">Estado</th>
-              <th className="px-4 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && compradores.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay compradores todavía.
-                </td>
-              </tr>
-            )}
-            {compradores.map((c) => (
-              <tr key={c.id} className="border-t">
-                <td className="px-4 py-2 font-medium">{c.nombre}</td>
-                <td className="px-4 py-2 text-muted-foreground">{c.identificacion ?? '—'}</td>
-                <td className="px-4 py-2 text-muted-foreground">{c.telefono ?? '—'}</td>
-                <td className="px-4 py-2 text-muted-foreground">
+      <Table className="mt-6 max-w-2xl">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Identificación</TableHead>
+            <TableHead>Teléfono</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={5}>Cargando…</TableEmpty>}
+          {!isLoading && compradores.length === 0 && (
+            <TableEmpty colSpan={5}>No hay compradores todavía.</TableEmpty>
+          )}
+          {compradores.map((c) => (
+            <TableRow key={c.id}>
+              <TableCell className="font-medium">{c.nombre}</TableCell>
+              <TableCell className="text-muted-foreground">{c.identificacion ?? '—'}</TableCell>
+              <TableCell className="text-muted-foreground">{c.telefono ?? '—'}</TableCell>
+              <TableCell>
+                <Badge variant={c.activo ? 'success' : 'neutral'} dot>
                   {c.activo ? 'Activo' : 'Inactivo'}
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={updatingId === c.id}
-                    onClick={() => toggleActivo(c)}
-                  >
-                    {c.activo ? 'Desactivar' : 'Activar'}
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={updatingId === c.id}
+                  onClick={() => toggleActivo(c)}
+                >
+                  {c.activo ? 'Desactivar' : 'Activar'}
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

@@ -6,6 +6,15 @@ import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -68,8 +77,8 @@ export default function TablaPreciosPage() {
     <div className="p-8">
       <h1 className="text-2xl font-semibold">Tabla de precios</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Precio absoluto por kg según tramo de factor de rendimiento y humedad. Solo aplica a café
-        mojado — la pasilla tiene precio directo por recepción.
+        Precio absoluto por kg según tramo de factor de rendimiento y humedad. Solo aplica a
+        recepciones de pergamino seco — mojado y pasilla tienen precio directo negociado.
       </p>
 
       <div className="mt-6 flex items-end gap-3">
@@ -148,56 +157,44 @@ export default function TablaPreciosPage() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-6 max-w-3xl overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Nombre</th>
-              <th className="px-4 py-2 font-medium">Factor</th>
-              <th className="px-4 py-2 font-medium">Humedad</th>
-              <th className="px-4 py-2 font-medium">Precio/kg</th>
-              <th className="px-4 py-2 font-medium">Punto de compra</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && tramos.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay tramos definidos para esta fecha.
-                </td>
-              </tr>
-            )}
-            {tramos.map((t) => (
-              <tr key={t.id} className="border-t">
-                <td className="px-4 py-2">{t.nombre ?? '—'}</td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {Number(t.factorMin)} – {Number(t.factorMax)}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {Number(t.humedadMin)}% – {Number(t.humedadMax)}%
-                </td>
-                <td className="px-4 py-2 font-medium">
-                  {new Intl.NumberFormat('es-CO', {
-                    style: 'currency',
-                    currency: 'COP',
-                    maximumFractionDigits: 0,
-                  }).format(Number(t.precioKg))}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {t.puntoCompraId ? 'Específico' : 'Todos'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table className="mt-6 max-w-3xl">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Factor</TableHead>
+            <TableHead>Humedad</TableHead>
+            <TableHead>Precio/kg</TableHead>
+            <TableHead>Punto de compra</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={5}>Cargando…</TableEmpty>}
+          {!isLoading && tramos.length === 0 && (
+            <TableEmpty colSpan={5}>No hay tramos definidos para esta fecha.</TableEmpty>
+          )}
+          {tramos.map((t) => (
+            <TableRow key={t.id}>
+              <TableCell>{t.nombre ?? '—'}</TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {Number(t.factorMin)} – {Number(t.factorMax)}
+              </TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {Number(t.humedadMin)}% – {Number(t.humedadMax)}%
+              </TableCell>
+              <TableCell className="font-medium tabular-nums">
+                {new Intl.NumberFormat('es-CO', {
+                  style: 'currency',
+                  currency: 'COP',
+                  maximumFractionDigits: 0,
+                }).format(Number(t.precioKg))}
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {t.puntoCompraId ? 'Específico' : 'Todos'}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

@@ -5,8 +5,19 @@ import type { PuntoCompra, Role, User } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState<User[]>([]);
@@ -108,9 +119,8 @@ export default function UsuariosPage() {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="password">Contraseña</Label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -155,57 +165,47 @@ export default function UsuariosPage() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-6 max-w-3xl overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Nombre</th>
-              <th className="px-4 py-2 font-medium">Correo</th>
-              <th className="px-4 py-2 font-medium">Roles</th>
-              <th className="px-4 py-2 font-medium">Estado</th>
-              <th className="px-4 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && usuarios.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay usuarios todavía.
-                </td>
-              </tr>
-            )}
-            {usuarios.map((u) => (
-              <tr key={u.id} className="border-t">
-                <td className="px-4 py-2 font-medium">{u.nombre}</td>
-                <td className="px-4 py-2 text-muted-foreground">{u.email}</td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {u.roles.map((r) => r.role.nombre).join(', ') || '—'}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
+      <Table className="mt-6 max-w-3xl">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Correo</TableHead>
+            <TableHead>Roles</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={5}>Cargando…</TableEmpty>}
+          {!isLoading && usuarios.length === 0 && (
+            <TableEmpty colSpan={5}>No hay usuarios todavía.</TableEmpty>
+          )}
+          {usuarios.map((u) => (
+            <TableRow key={u.id}>
+              <TableCell className="font-medium">{u.nombre}</TableCell>
+              <TableCell className="text-muted-foreground">{u.email}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {u.roles.map((r) => r.role.nombre).join(', ') || '—'}
+              </TableCell>
+              <TableCell>
+                <Badge variant={u.activo ? 'success' : 'neutral'} dot>
                   {u.activo ? 'Activo' : 'Inactivo'}
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={updatingId === u.id}
-                    onClick={() => toggleActivo(u)}
-                  >
-                    {u.activo ? 'Desactivar' : 'Activar'}
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={updatingId === u.id}
+                  onClick={() => toggleActivo(u)}
+                >
+                  {u.activo ? 'Desactivar' : 'Activar'}
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

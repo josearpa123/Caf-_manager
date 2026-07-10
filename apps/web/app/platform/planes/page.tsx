@@ -6,6 +6,15 @@ import { platformApi, ApiError } from '@/lib/platform-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export default function PlanesPage() {
   const [planes, setPlanes] = useState<Plan[]>([]);
@@ -102,42 +111,30 @@ export default function PlanesPage() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-6 max-w-2xl overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Nombre</th>
-              <th className="px-4 py-2 font-medium">Máx. usuarios</th>
-              <th className="px-4 py-2 font-medium">Máx. puntos de compra</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && planes.length === 0 && (
-              <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay planes todavía.
-                </td>
-              </tr>
-            )}
-            {planes.map((p) => (
-              <tr key={p.id} className="border-t">
-                <td className="px-4 py-2 font-medium">{p.nombre}</td>
-                <td className="px-4 py-2 text-muted-foreground">{p.maxUsuarios}</td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {p.maxPuntosCompra ?? 'Sin límite'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table className="mt-6 max-w-2xl">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Máx. usuarios</TableHead>
+            <TableHead>Máx. puntos de compra</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={3}>Cargando…</TableEmpty>}
+          {!isLoading && planes.length === 0 && (
+            <TableEmpty colSpan={3}>No hay planes todavía.</TableEmpty>
+          )}
+          {planes.map((p) => (
+            <TableRow key={p.id}>
+              <TableCell className="font-medium">{p.nombre}</TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">{p.maxUsuarios}</TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {p.maxPuntosCompra ?? 'Sin límite'}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

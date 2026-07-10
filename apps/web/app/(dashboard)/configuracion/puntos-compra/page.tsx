@@ -6,6 +6,16 @@ import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export default function PuntosCompraPage() {
   const [puntos, setPuntos] = useState<PuntoCompra[]>([]);
@@ -118,55 +128,45 @@ export default function PuntosCompraPage() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-6 max-w-3xl overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Nombre</th>
-              <th className="px-4 py-2 font-medium">Dirección</th>
-              <th className="px-4 py-2 font-medium">Municipio</th>
-              <th className="px-4 py-2 font-medium">Estado</th>
-              <th className="px-4 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && puntos.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay puntos de compra todavía.
-                </td>
-              </tr>
-            )}
-            {puntos.map((p) => (
-              <tr key={p.id} className="border-t">
-                <td className="px-4 py-2 font-medium">{p.nombre}</td>
-                <td className="px-4 py-2 text-muted-foreground">{p.direccion ?? '—'}</td>
-                <td className="px-4 py-2 text-muted-foreground">{p.municipio ?? '—'}</td>
-                <td className="px-4 py-2 text-muted-foreground">
+      <Table className="mt-6 max-w-3xl">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Dirección</TableHead>
+            <TableHead>Municipio</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={5}>Cargando…</TableEmpty>}
+          {!isLoading && puntos.length === 0 && (
+            <TableEmpty colSpan={5}>No hay puntos de compra todavía.</TableEmpty>
+          )}
+          {puntos.map((p) => (
+            <TableRow key={p.id}>
+              <TableCell className="font-medium">{p.nombre}</TableCell>
+              <TableCell className="text-muted-foreground">{p.direccion ?? '—'}</TableCell>
+              <TableCell className="text-muted-foreground">{p.municipio ?? '—'}</TableCell>
+              <TableCell>
+                <Badge variant={p.activo ? 'success' : 'neutral'} dot>
                   {p.activo ? 'Activo' : 'Inactivo'}
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={updatingId === p.id}
-                    onClick={() => toggleActivo(p)}
-                  >
-                    {p.activo ? 'Desactivar' : 'Activar'}
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={updatingId === p.id}
+                  onClick={() => toggleActivo(p)}
+                >
+                  {p.activo ? 'Desactivar' : 'Activar'}
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

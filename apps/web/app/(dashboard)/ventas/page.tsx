@@ -5,6 +5,17 @@ import Link from 'next/link';
 import type { Venta } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
 import { buttonVariants } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { tipoCafeVariant } from '@/lib/badge-variants';
 
 function formatMoney(value: string) {
   return new Intl.NumberFormat('es-CO', {
@@ -43,54 +54,50 @@ export default function VentasPage() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-6 overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Código</th>
-              <th className="px-4 py-2 font-medium">Fecha</th>
-              <th className="px-4 py-2 font-medium">Comprador</th>
-              <th className="px-4 py-2 font-medium">Tipo</th>
-              <th className="px-4 py-2 font-medium">Cantidad</th>
-              <th className="px-4 py-2 font-medium">Precio/kg</th>
-              <th className="px-4 py-2 font-medium">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && ventas.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay ventas registradas.
-                </td>
-              </tr>
-            )}
-            {ventas.map((v) => (
-              <tr key={v.id} className="border-t">
-                <td className="px-4 py-2">
-                  <Link href={`/ventas/${v.id}`} className="font-medium hover:underline">
-                    {v.codigo}
-                  </Link>
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {new Date(v.fecha).toLocaleDateString('es-CO')}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">{v.compradorNombre}</td>
-                <td className="px-4 py-2 text-muted-foreground">{v.tipoCafe}</td>
-                <td className="px-4 py-2 text-muted-foreground">{Number(v.cantidadKg)} kg</td>
-                <td className="px-4 py-2 text-muted-foreground">{formatMoney(v.precioKg)}</td>
-                <td className="px-4 py-2 font-medium">{formatMoney(v.valorTotal)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table className="mt-6">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Código</TableHead>
+            <TableHead>Fecha</TableHead>
+            <TableHead>Comprador</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Cantidad</TableHead>
+            <TableHead>Precio/kg</TableHead>
+            <TableHead>Total</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={7}>Cargando…</TableEmpty>}
+          {!isLoading && ventas.length === 0 && (
+            <TableEmpty colSpan={7}>No hay ventas registradas.</TableEmpty>
+          )}
+          {ventas.map((v) => (
+            <TableRow key={v.id}>
+              <TableCell>
+                <Link href={`/ventas/${v.id}`} className="font-medium hover:underline">
+                  {v.codigo}
+                </Link>
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {new Date(v.fecha).toLocaleDateString('es-CO')}
+              </TableCell>
+              <TableCell className="text-muted-foreground">{v.compradorNombre}</TableCell>
+              <TableCell>
+                <Badge variant={tipoCafeVariant(v.tipoCafe)}>{v.tipoCafe}</Badge>
+              </TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {Number(v.cantidadKg)} kg
+              </TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {formatMoney(v.precioKg)}
+              </TableCell>
+              <TableCell className="font-medium tabular-nums">
+                {formatMoney(v.valorTotal)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

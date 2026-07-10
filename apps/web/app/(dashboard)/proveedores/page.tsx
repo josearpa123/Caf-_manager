@@ -3,9 +3,20 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { Proveedor } from '@coffee-manager/shared-types';
+import { Search } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export default function ProveedoresPage() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
@@ -59,12 +70,15 @@ export default function ProveedoresPage() {
       </div>
 
       <div className="mt-4 flex items-center gap-3">
-        <Input
-          placeholder="Buscar por nombre o identificación…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          className="max-w-xs"
-        />
+        <div className="relative max-w-xs flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre o identificación…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="pl-8"
+          />
+        </div>
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <input
             type="checkbox"
@@ -77,73 +91,55 @@ export default function ProveedoresPage() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-6 overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Nombre</th>
-              <th className="px-4 py-2 font-medium">Identificación</th>
-              <th className="px-4 py-2 font-medium">Municipio</th>
-              <th className="px-4 py-2 font-medium">Teléfono</th>
-              <th className="px-4 py-2 font-medium">Estado</th>
-              <th className="px-4 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && proveedores.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay proveedores registrados.
-                </td>
-              </tr>
-            )}
-            {proveedores.map((proveedor) => (
-              <tr key={proveedor.id} className="border-t">
-                <td className="px-4 py-2">
-                  <Link
-                    href={`/proveedores/${proveedor.id}`}
-                    className="font-medium hover:underline"
-                  >
-                    {proveedor.nombre}
-                  </Link>
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {proveedor.tipoIdentificacion} {proveedor.numeroIdentificacion}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {proveedor.municipio ?? '—'}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {proveedor.telefono ?? '—'}
-                </td>
-                <td className="px-4 py-2">
-                  <span
-                    className={
-                      proveedor.activo
-                        ? 'rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary'
-                        : 'rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground'
-                    }
-                  >
-                    {proveedor.activo ? 'Activo' : 'Inactivo'}
-                  </span>
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <Button variant="ghost" size="sm" onClick={() => toggleActivo(proveedor)}>
-                    {proveedor.activo ? 'Desactivar' : 'Reactivar'}
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table className="mt-6">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Identificación</TableHead>
+            <TableHead>Municipio</TableHead>
+            <TableHead>Teléfono</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={6}>Cargando…</TableEmpty>}
+          {!isLoading && proveedores.length === 0 && (
+            <TableEmpty colSpan={6}>No hay proveedores registrados.</TableEmpty>
+          )}
+          {proveedores.map((proveedor) => (
+            <TableRow key={proveedor.id}>
+              <TableCell>
+                <Link
+                  href={`/proveedores/${proveedor.id}`}
+                  className="font-medium hover:underline"
+                >
+                  {proveedor.nombre}
+                </Link>
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {proveedor.tipoIdentificacion} {proveedor.numeroIdentificacion}
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {proveedor.municipio ?? '—'}
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {proveedor.telefono ?? '—'}
+              </TableCell>
+              <TableCell>
+                <Badge variant={proveedor.activo ? 'success' : 'neutral'} dot>
+                  {proveedor.activo ? 'Activo' : 'Inactivo'}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right">
+                <Button variant="ghost" size="sm" onClick={() => toggleActivo(proveedor)}>
+                  {proveedor.activo ? 'Desactivar' : 'Reactivar'}
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

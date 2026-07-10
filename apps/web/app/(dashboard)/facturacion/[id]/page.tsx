@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
 
 function formatMoney(value: string) {
   return new Intl.NumberFormat('es-CO', {
@@ -22,6 +23,13 @@ const ESTADO_LABEL: Record<string, string> = {
   EMITIDA: 'Emitida',
   ANULADA: 'Anulada',
   ERROR: 'Error al emitir',
+};
+
+const ESTADO_VARIANT: Record<string, NonNullable<BadgeProps['variant']>> = {
+  PENDIENTE: 'neutral',
+  EMITIDA: 'success',
+  ANULADA: 'outline',
+  ERROR: 'destructive',
 };
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -89,10 +97,12 @@ export default function FacturaDetallePage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Factura — {factura.recepcion.codigo}</h1>
-      <p className="text-sm text-muted-foreground">
-        Estado: {ESTADO_LABEL[factura.estado] ?? factura.estado}
-      </p>
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-semibold">Factura — {factura.recepcion.codigo}</h1>
+        <Badge variant={ESTADO_VARIANT[factura.estado] ?? 'neutral'}>
+          {ESTADO_LABEL[factura.estado] ?? factura.estado}
+        </Badge>
+      </div>
 
       <Card className="mt-6 max-w-xl">
         <CardHeader>

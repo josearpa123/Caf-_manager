@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 export default function SecadoDetallePage() {
   const params = useParams<{ id: string }>();
@@ -63,9 +64,13 @@ export default function SecadoDetallePage() {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Estado</p>
-            <p className="text-sm font-medium">
+            <Badge
+              className="mt-1"
+              variant={proceso.estado === 'FINALIZADO' ? 'success' : 'warning'}
+              dot
+            >
               {proceso.estado === 'FINALIZADO' ? 'Finalizado' : 'En proceso'}
-            </p>
+            </Badge>
           </div>
           {proceso.estado === 'FINALIZADO' && (
             <>

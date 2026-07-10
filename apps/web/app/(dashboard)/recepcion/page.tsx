@@ -5,6 +5,17 @@ import Link from 'next/link';
 import type { Recepcion } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
 import { buttonVariants } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { tipoCafeVariant } from '@/lib/badge-variants';
 
 function formatMoney(value: string) {
   return new Intl.NumberFormat('es-CO', {
@@ -45,54 +56,50 @@ export default function RecepcionPage() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-6 overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Código</th>
-              <th className="px-4 py-2 font-medium">Fecha</th>
-              <th className="px-4 py-2 font-medium">Proveedor</th>
-              <th className="px-4 py-2 font-medium">Tipo</th>
-              <th className="px-4 py-2 font-medium">Peso neto</th>
-              <th className="px-4 py-2 font-medium">Precio/kg</th>
-              <th className="px-4 py-2 font-medium">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!isLoading && recepciones.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
-                  No hay recepciones registradas.
-                </td>
-              </tr>
-            )}
-            {recepciones.map((r) => (
-              <tr key={r.id} className="border-t">
-                <td className="px-4 py-2">
-                  <Link href={`/recepcion/${r.id}`} className="font-medium hover:underline">
-                    {r.codigo}
-                  </Link>
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {new Date(r.fecha).toLocaleDateString('es-CO')}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">{r.proveedor.nombre}</td>
-                <td className="px-4 py-2 text-muted-foreground">{r.tipoCafe}</td>
-                <td className="px-4 py-2 text-muted-foreground">{Number(r.pesoNeto)} kg</td>
-                <td className="px-4 py-2 text-muted-foreground">{formatMoney(r.precioKg)}</td>
-                <td className="px-4 py-2 font-medium">{formatMoney(r.valorTotal)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table className="mt-6">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Código</TableHead>
+            <TableHead>Fecha</TableHead>
+            <TableHead>Proveedor</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Peso neto</TableHead>
+            <TableHead>Precio/kg</TableHead>
+            <TableHead>Total</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableEmpty colSpan={7}>Cargando…</TableEmpty>}
+          {!isLoading && recepciones.length === 0 && (
+            <TableEmpty colSpan={7}>No hay recepciones registradas.</TableEmpty>
+          )}
+          {recepciones.map((r) => (
+            <TableRow key={r.id}>
+              <TableCell>
+                <Link href={`/recepcion/${r.id}`} className="font-medium hover:underline">
+                  {r.codigo}
+                </Link>
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {new Date(r.fecha).toLocaleDateString('es-CO')}
+              </TableCell>
+              <TableCell className="text-muted-foreground">{r.proveedor.nombre}</TableCell>
+              <TableCell>
+                <Badge variant={tipoCafeVariant(r.tipoCafe)}>{r.tipoCafe}</Badge>
+              </TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {Number(r.pesoNeto)} kg
+              </TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {formatMoney(r.precioKg)}
+              </TableCell>
+              <TableCell className="font-medium tabular-nums">
+                {formatMoney(r.valorTotal)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
