@@ -6,10 +6,10 @@
 
 ## Fase actual (según cronograma en `docs/doc.md` §7.2)
 
-**FASE 2: Desarrollo del MVP — Sprint 1-2**
+**FASE 2: Desarrollo del MVP — Sprint 1-2, cerrando hacia Sprint 3-4**
 
-Terminado: módulo de autenticación y usuarios (backend+infra), módulo de Proveedores completo (backend + frontend), fix de bugs estructurales que bloqueaban TODO módulo tenant-scoped.
-Siguiente: módulo de Recepción de café (backend + frontend) — es el siguiente ítem del Sprint 1-2 en `docs/doc.md`.
+Terminado: autenticación/usuarios, Proveedores completo, Recepción completo (con tabla de precios y catálogo de defectos), fix de bugs estructurales que bloqueaban TODO módulo tenant-scoped.
+Siguiente: módulo de **Calidad** ya tiene lo esencial (catálogo de defectos + el análisis se registra dentro de Recepción) — el siguiente ítem natural es **Bodega** (conversión mojado→seco→almendra) o **Pagos**, ver sección de abajo.
 
 ## Fase 1 — Planificación y Diseño: COMPLETA
 
@@ -17,54 +17,64 @@ Siguiente: módulo de Recepción de café (backend + frontend) — es el siguien
 - Schema de Prisma completo (`apps/api/prisma/schema.prisma`, 885 líneas).
 - Migración inicial aplicada: `apps/api/prisma/migrations/20260709213548_init_schema`.
 
-## Fixes estructurales de esta sesión (importante para entender el estado real)
+## Fixes estructurales (sesión del módulo Proveedores — siguen vigentes)
 
-Antes de esta sesión, **ningún módulo tenant-scoped había sido probado end-to-end** — compilaban pero nunca corrieron con guards activos. Se encontraron y corrigieron 3 bugs reales:
+Antes de esa sesión, **ningún módulo tenant-scoped había sido probado end-to-end**. Se encontraron y corrigieron 4 bugs reales, documentados en detalle en el historial de git (commit "Implementa módulo de Proveedores y corrige bugs..."):
 
-1. **Guards nunca registrados globalmente**: `JwtAuthGuard`/`PermissionsGuard` existían pero no estaban wireados en ningún lado (`apps/api/src/app.module.ts` ahora los registra vía `APP_GUARD`).
-2. **Errores de tipos de Prisma preexistentes** que rompían `pnpm build` (`users.service.ts`, `roles.service.ts`, `tenants.service.ts`, `puntos-compra.service.ts`, `configuracion.service.ts`): faltaba `import type` para `TenantPrismaClient` y `tenantId` explícito en los `create`. Corregido en todos, y el patrón (`tenantId` como parámetro explícito desde `@CurrentUser('tenantId')`) es el que hay que seguir en módulos nuevos.
-3. **Bug estructural de NestJS** (el más serio): el provider `TENANT_PRISMA` (request-scoped) se instanciaba **antes** de que corrieran los guards (`loadPerContext` ocurre antes del pipeline de guards — ver `router-explorer.js` de `@nestjs/core`), así que leer `request.user` ahí siempre fallaba. Se corrigió en `apps/api/src/prisma/tenant-prisma.provider.ts`: ahora verifica el JWT de forma independiente (con `JwtService.verify`) en vez de depender de que el guard ya haya poblado `request.user`. Este bug afectaba a **todos** los módulos tenant-scoped (users, tenants, puntos-compra, proveedores), no solo el nuevo.
-4. **Fuga de seguridad encontrada al probar**: `UsersService` devolvía `passwordHash` (bcrypt) en las respuestas de `/users`. Corregido usando `select` explícito en vez de `include`.
+1. Guards (`JwtAuthGuard`/`PermissionsGuard`) nunca registrados globalmente — corregido en `app.module.ts` vía `APP_GUARD`.
+2. Errores de tipos de Prisma preexistentes que rompían `pnpm build` — corregido (patrón: `tenantId` explícito desde `@CurrentUser('tenantId')`, `import type` para `TenantPrismaClient`).
+3. Bug estructural de NestJS: `TENANT_PRISMA` (request-scoped) se instanciaba antes de que corrieran los guards. Corregido en `tenant-prisma.provider.ts` verificando el JWT de forma independiente.
+4. Fuga de `passwordHash` en `/users` — corregido con `select` explícito.
 
-Todo esto se verificó con un flujo real end-to-end (docker compose postgres, migración, seed, creación de tenant vía `/platform`, login, CRUD de proveedores, aislamiento entre tenants, y un caso negativo de permisos con 403) — no solo compilación.
+Estos 4 fixes son la base que hace posible que Proveedores y Recepción funcionen; cualquier módulo nuevo debe seguir el mismo patrón (ver ejemplos en `proveedores.service.ts` y `recepcion.service.ts`).
 
 ## Backend (`apps/api` — NestJS + Prisma)
 
 ### Implementado
 - Multi-tenancy: extensión de Prisma con scoping automático por `tenantId` (`src/prisma/extensions/tenant-scoping.extension.ts`).
 - **Auth**: login + refresh token JWT (`src/modules/auth`).
-- **Users + Roles**: CRUD de usuarios, roles con permisos granulares M2M (`src/modules/users`). Ya no filtra `passwordHash`.
+- **Users + Roles**: CRUD de usuarios, roles con permisos granulares M2M (`src/modules/users`).
 - **Platform**: panel de super-admin, creación manual de tenants (`src/modules/platform`).
 - **Tenants**: configuración de empresa (NIT, resolución DIAN) y puntos de compra (`src/modules/tenants`).
-- **Proveedores**: CRUD completo (`src/modules/proveedores`) — crear/listar/buscar/filtrar/editar/desactivar/reactivar, con validación de duplicados (tipo+número de identificación) y `createdById` de auditoría.
+- **Proveedores**: CRUD completo (`src/modules/proveedores`) — crear/listar/buscar/filtrar/editar/desactivar/reactivar, validación de duplicados.
+- **Calidad**: `GET /calidad/defectos-tipo` — catálogo global de defectos (Cenicafé/FNC), usado por Recepción.
+- **Recepción** (`src/modules/recepcion`) — módulo completo:
+  - `POST /tabla-precios`, `GET /tabla-precios?fecha=` — tramos de precio por factor de rendimiento + humedad (precio absoluto por kg, vigente por fecha, opcionalmente por punto de compra).
+  - `POST /recepcion` — crea una recepción MOJADO (con `AnalisisCalidad` + defectos anidados en la misma transacción, factor de rendimiento calculado o manual, matcheo automático del tramo de precio vigente según humedad+factor) o PASILLA (precio directo negociado, sin análisis de calidad). Genera código correlativo `REC-{año}-{secuencial}` por tenant.
+  - `GET /recepcion` (filtros: proveedor, punto de compra, tipo, rango de fechas), `GET /recepcion/:id` (detalle completo).
+  - **Alcance deliberadamente limitado en esta pasada**: no hay `PATCH`/`DELETE` de recepciones (son registros financieros — editarlas requiere recalcular inventario/pagos/facturas asociados, se deja para cuando existan esos módulos). Tampoco hay generación de PDF del recibo todavía.
 - **Audit log**: registro de cambios en módulos sensibles (`src/common/audit`).
-- Guards: `JwtAuthGuard`, `PermissionsGuard`, `PlatformAuthGuard` — ahora sí registrados globalmente y verificados funcionando.
+- Guards: `JwtAuthGuard`, `PermissionsGuard`, `PlatformAuthGuard` — registrados globalmente.
+
+Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, recepción mojado con factor calculado y defectos, recepción pasilla, error claro cuando no hay tramo vigente, aislamiento entre tenants, caso de permisos denegados (403).
 
 ### Pendiente (scaffold vacío — controller/service/module creados pero SIN lógica de negocio)
-- `recepcion` — recepción de café + cálculo de calidad/precio ⬅ **siguiente a implementar**
-- `calidad`
-- `bodega` — conversión mojado→seco→almendra, pasilla
-- `pagos`
+- `bodega` — conversión mojado→seco→almendra, pasilla (mezcla o venta separada) ⬅ **candidato a seguir**
+- `pagos` — pagos a proveedores, anticipos, cuentas por pagar
 - `facturacion` — adaptador DIAN (Factus/Siigo, decisión de proveedor diferida)
-- `ventas`
+- `ventas` — venta de café procesado
 - `reportes` — dashboard y KPIs
 
 ## Frontend (`apps/web` — Next.js)
 
 ### Implementado
-- Cliente API (`lib/api.ts`): fetch wrapper con token Bearer + manejo de errores.
-- Autenticación (`lib/auth.tsx`): `AuthProvider`/`useAuth`, login real conectado a `POST /auth/login`, guardado de sesión en `localStorage`.
-- Página de login real (`app/(auth)/login/page.tsx`) con react-hook-form + zod.
-- Layout de dashboard protegido (`app/(dashboard)/layout.tsx`): redirige a `/login` si no hay sesión, nav con estado activo, botón de logout.
-- Componentes UI base sin Radix (`components/ui/`: button, input, label, select, card).
-- **Módulo Proveedores completo**: listado con búsqueda/filtro (`app/(dashboard)/proveedores/page.tsx`), alta (`.../nuevo`), edición (`.../[id]`), formulario compartido (`components/proveedores/proveedor-form.tsx`) validado con Zod desde `packages/validation-schemas`.
-- `packages/shared-types` y `packages/validation-schemas` ahora se usan de verdad: enums (`TipoIdentificacion`), tipo `Proveedor`, y `proveedorSchema` compartido. Enlazados a `apps/web` como dependencias de workspace (`next.config.mjs` con `transpilePackages`).
+- Cliente API (`lib/api.ts`) y autenticación (`lib/auth.tsx`) con sesión en `localStorage`.
+- Login real, layout de dashboard protegido, componentes UI base sin Radix (`components/ui/`).
+- **Módulo Proveedores completo**: listado con búsqueda/filtro, alta, edición, validado con Zod compartido (`packages/validation-schemas`).
+- **Módulo Recepción completo**:
+  - `app/(dashboard)/recepcion/page.tsx` — listado con montos formateados en COP.
+  - `app/(dashboard)/recepcion/nueva/page.tsx` — formulario con toggle Mojado/Pasilla, selects de proveedor/punto de compra (poblados desde la API), campos condicionales de calidad (humedad, factor calculado con preview en vivo o manual, defectos con selector del catálogo), campo de precio directo para pasilla.
+  - `app/(dashboard)/recepcion/[id]/page.tsx` — detalle de solo lectura.
+  - `app/(dashboard)/recepcion/precios/page.tsx` — alta y listado de tramos de precio del día.
+  - **Nota de diseño**: este formulario usa estado local (`useState`) en vez de react-hook-form+Zod compartido como Proveedores, porque los campos condicionales (mojado vs. pasilla, factor calculado vs. manual, lista dinámica de defectos) son más simples de manejar así dado el tiempo disponible. La validación fina vive en el backend; el frontend hace solo validación básica de campos requeridos y muestra los errores del servidor.
+- `packages/shared-types` ampliado con `PuntoCompra`, `DefectoTipo`, `TablaPrecioTramo`, `AnalisisCalidad`, `DefectoAnalisis`, `Recepcion`, `CategoriaDefecto`.
 
 ### Pendiente
-- El resto de páginas de dashboard siguen siendo placeholders ("Próximamente"): recepción, bodega, pagos, facturación, reportes, configuración.
-- `register` sigue como placeholder — **correcto así**, el onboarding de tenants es manual por diseño (ver `requerimientos.md`), no hay registro self-service.
-- No hay refresh automático de token (se guarda el refresh token pero no hay interceptor de renovación); por ahora si expira el access token (15 min) hay que volver a loguear.
-- No se probó visualmente en un navegador real (no hay herramienta de automatización de navegador disponible en esta sesión) — se verificó con `next build`/`next lint` limpios, todas las rutas devolviendo 200, y las formas de datos exactas que consume el frontend confirmadas contra las respuestas reales de la API vía curl.
+- Páginas de dashboard aún placeholder: bodega, pagos, facturación, reportes, configuración.
+- `register` sigue como placeholder — **correcto así** (onboarding manual por diseño).
+- No hay refresh automático de token (access token dura 15 min; toca volver a loguear si expira a mitad de una sesión larga).
+- No se probó visualmente en un navegador real en ninguna sesión (no hay herramienta de automatización de navegador disponible) — se verificó con `next build`/`next lint` limpios, todas las rutas devolviendo 200, y las formas de datos del frontend confirmadas contra las respuestas reales de la API vía curl.
+- Recepción: no hay impresión/PDF del recibo, ni edición/anulación de una recepción ya creada (ver nota de alcance en la sección de backend).
 
 ## Cómo levantar el entorno de desarrollo
 
@@ -75,11 +85,11 @@ pnpm --filter api build && node apps/api/dist/src/main   # o: pnpm --filter api 
 pnpm --filter web dev   # http://localhost:3000
 ```
 
-Para crear el primer tenant de prueba: `POST /platform/auth/login` (con `PLATFORM_ADMIN_EMAIL`/`PASSWORD` del seed) y luego `POST /platform/tenants`.
+Para crear el primer tenant de prueba: `POST /platform/auth/login` (con `PLATFORM_ADMIN_EMAIL`/`PASSWORD` del seed) y luego `POST /platform/tenants`. Para poder crear una recepción MOJADO hace falta antes crear al menos un punto de compra (`POST /puntos-compra`) y un tramo de precio vigente para la fecha (`POST /tabla-precios`), o usar la página `/recepcion/precios`.
 
 ## Cómo retomar en la próxima sesión
 
 1. Leer este archivo.
-2. Si hay dudas de diseño (reglas de negocio, campos obligatorios, etc.), revisar `docs/requerimientos.md` — ya están la mayoría resueltas ahí.
-3. Continuar con: **implementar módulo de Recepción** (backend: `src/modules/recepcion/*` + frontend: `app/(dashboard)/recepcion/`), siguiendo el mismo patrón que Proveedores (DTOs con class-validator, service con `@InjectTenantPrisma`, `tenantId` explícito en creates, controller con `@RequirePermissions`). Recepción es más compleja: depende de Proveedores (ya listo) y de la tabla de precios por calidad (`TablaPrecioTramo`, aún sin UI de configuración — puede necesitarse antes o en paralelo).
-4. Al terminar una sesión de trabajo, actualizar este archivo: mover lo completado de "Pendiente" a "Implementado" y ajustar "Fase actual" / "siguiente paso".
+2. Si hay dudas de diseño, revisar `docs/requerimientos.md`.
+3. Elegir el siguiente módulo — recomendado **Bodega** (conversión mojado→seco, trilla, pasilla) porque es lo que consume el inventario que generan las Recepciones ya implementadas; alternativamente **Pagos** si se prioriza el flujo de caja con proveedores. Seguir el mismo patrón que Proveedores/Recepción: DTOs con class-validator, service con `@InjectTenantPrisma`, `tenantId` explícito en creates, controller con `@RequirePermissions`, y siempre probar con curl (crear tenant de prueba → login → CRUD) antes de dar el backend por terminado, porque el bug estructural de guards (ver arriba) es fácil de reintroducir si se copia un patrón viejo sin cuidado.
+4. Al terminar una sesión de trabajo, actualizar este archivo.

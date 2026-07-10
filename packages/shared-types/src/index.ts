@@ -112,6 +112,13 @@ export const Permission = {
 } as const;
 export type Permission = (typeof Permission)[keyof typeof Permission];
 
+export const CategoriaDefecto = {
+  PRIMARIO: 'PRIMARIO',
+  SECUNDARIO: 'SECUNDARIO',
+} as const;
+export type CategoriaDefecto =
+  (typeof CategoriaDefecto)[keyof typeof CategoriaDefecto];
+
 export interface Proveedor {
   id: string;
   tenantId: string;
@@ -128,4 +135,92 @@ export interface Proveedor {
   createdById: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PuntoCompra {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  direccion: string | null;
+  telefono: string | null;
+  municipio: string | null;
+  departamento: string | null;
+  activo: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DefectoTipo {
+  id: string;
+  codigo: string;
+  nombre: string;
+  categoria: CategoriaDefecto;
+  orden: number;
+  activo: boolean;
+}
+
+export interface TablaPrecioTramo {
+  id: string;
+  tenantId: string;
+  puntoCompraId: string | null;
+  fecha: string;
+  nombre: string | null;
+  factorMin: string;
+  factorMax: string;
+  humedadMin: string;
+  humedadMax: string;
+  precioKg: string;
+  createdById: string;
+  createdAt: string;
+}
+
+export interface DefectoAnalisis {
+  id: string;
+  analisisCalidadId: string;
+  defectoTipoId: string;
+  pesoKg: string | null;
+  porcentaje: string | null;
+  defectoTipo: DefectoTipo;
+}
+
+export interface AnalisisCalidad {
+  id: string;
+  tenantId: string;
+  recepcionId: string;
+  humedad: string;
+  modoFactor: ModoFactorRendimiento;
+  pesoMuestraKg: string | null;
+  pesoAlmendraMuestraKg: string | null;
+  factorRendimiento: string;
+  densidad: string | null;
+  tamanoGrano: string | null;
+  observaciones: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  defectos: DefectoAnalisis[];
+}
+
+export interface Recepcion {
+  id: string;
+  tenantId: string;
+  puntoCompraId: string;
+  proveedorId: string;
+  codigo: string;
+  tipoCafe: TipoCafeRecepcion;
+  fecha: string;
+  pesoBruto: string;
+  pesoTara: string;
+  pesoNeto: string;
+  tablaPrecioTramoId: string | null;
+  precioKg: string;
+  valorTotal: string;
+  destinoPasilla: DestinoPasilla | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  proveedor: Pick<Proveedor, 'id' | 'nombre' | 'tipoIdentificacion' | 'numeroIdentificacion'> | Pick<Proveedor, 'nombre'>;
+  puntoCompra: Pick<PuntoCompra, 'id' | 'nombre'> | Pick<PuntoCompra, 'nombre'>;
+  tablaPrecioTramo: TablaPrecioTramo | null;
+  analisisCalidad: AnalisisCalidad | null;
 }
