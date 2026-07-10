@@ -24,6 +24,10 @@ export class RegistrarTenantDto {
   @IsNotEmpty()
   adminNombre: string;
 
+  @IsOptional()
+  @IsString()
+  adminTelefono?: string;
+
   @IsString()
   @MinLength(8)
   adminPassword: string;

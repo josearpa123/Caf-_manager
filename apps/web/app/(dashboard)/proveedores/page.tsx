@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { Proveedor } from '@coffee-manager/shared-types';
 import { Search } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -62,12 +63,14 @@ export default function ProveedoresPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Proveedores</h1>
-        <Link href="/proveedores/nuevo" className={buttonVariants()}>
-          Nuevo proveedor
-        </Link>
-      </div>
+      <PageHeader
+        title="Proveedores"
+        actions={
+          <Link href="/proveedores/nuevo" className={buttonVariants()}>
+            Nuevo proveedor
+          </Link>
+        }
+      />
 
       <div className="mt-4 flex items-center gap-3">
         <div className="relative max-w-xs flex-1">

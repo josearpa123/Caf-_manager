@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import type { Factura } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -97,12 +98,14 @@ export default function FacturaDetallePage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-semibold">Factura — {factura.recepcion.codigo}</h1>
-        <Badge variant={ESTADO_VARIANT[factura.estado] ?? 'neutral'}>
-          {ESTADO_LABEL[factura.estado] ?? factura.estado}
-        </Badge>
-      </div>
+      <PageHeader
+        title={`Factura — ${factura.recepcion.codigo}`}
+        actions={
+          <Badge variant={ESTADO_VARIANT[factura.estado] ?? 'neutral'}>
+            {ESTADO_LABEL[factura.estado] ?? factura.estado}
+          </Badge>
+        }
+      />
 
       <Card className="mt-6 max-w-xl">
         <CardHeader>

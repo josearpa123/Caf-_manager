@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const [nit, setNit] = useState('');
   const [adminNombre, setAdminNombre] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
+  const [adminTelefono, setAdminTelefono] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [planId, setPlanId] = useState('');
 
@@ -45,6 +46,7 @@ export default function RegisterPage() {
         nit: nit || undefined,
         adminNombre,
         adminEmail,
+        adminTelefono: adminTelefono || undefined,
         adminPassword,
         planId: planId || undefined,
       });
@@ -113,6 +115,16 @@ export default function RegisterPage() {
               value={adminEmail}
               onChange={(e) => setAdminEmail(e.target.value)}
               required
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="adminTelefono">Teléfono de contacto (opcional)</Label>
+            <Input
+              id="adminTelefono"
+              type="tel"
+              autoComplete="tel"
+              value={adminTelefono}
+              onChange={(e) => setAdminTelefono(e.target.value)}
             />
           </div>
           <div className="flex flex-col gap-1.5">

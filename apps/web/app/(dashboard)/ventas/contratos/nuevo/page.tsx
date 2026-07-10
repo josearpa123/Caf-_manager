@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { Comprador, PuntoCompra } from '@coffee-manager/shared-types';
 import { TipoInventario } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -136,12 +137,12 @@ export default function NuevoContratoVentaPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Nuevo contrato de venta anticipada</h1>
-      <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-        Fija hoy el precio y la cantidad con una trilladora/comprador. Después, cada entrega se
-        registra desde &quot;Nueva venta&quot; seleccionando este contrato — el precio queda
-        bloqueado, tú solo indicas cuánto entregas cada vez.
-      </p>
+      <PageHeader
+        title="Nuevo contrato de venta anticipada"
+        description={
+          'Fija hoy el precio y la cantidad con una trilladora/comprador. Después, cada entrega se registra desde "Nueva venta" seleccionando este contrato — el precio queda bloqueado, tú solo indicas cuánto entregas cada vez.'
+        }
+      />
 
       <form onSubmit={onSubmit} className="mt-6 flex max-w-xl flex-col gap-6">
         <div className="grid grid-cols-2 gap-4">

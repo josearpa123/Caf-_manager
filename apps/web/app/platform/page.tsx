@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { EstadoTenant, Plan, PlatformTenant } from '@coffee-manager/shared-types';
 import { platformApi, ApiError } from '@/lib/platform-api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ const ESTADO_LABEL: Record<string, string> = {
   SUSPENDIDO: 'Suspendido',
   PRUEBA: 'Prueba',
   PENDIENTE: 'Pendiente de aprobación',
+  RECHAZADO: 'Rechazado',
 };
 
 const ESTADO_VARIANT: Record<string, NonNullable<BadgeProps['variant']>> = {
@@ -29,6 +31,7 @@ const ESTADO_VARIANT: Record<string, NonNullable<BadgeProps['variant']>> = {
   SUSPENDIDO: 'destructive',
   PRUEBA: 'warning',
   PENDIENTE: 'primary',
+  RECHAZADO: 'neutral',
 };
 
 export default function PlatformDashboardPage() {
@@ -85,21 +88,30 @@ export default function PlatformDashboardPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Tenants</h1>
-        <Link href="/platform/tenants/nuevo" className={buttonVariants()}>
-          Nuevo tenant
-        </Link>
-      </div>
+      <PageHeader
+        title="Tenants"
+        description="Todas las cuentas de la plataforma, activas o no."
+        actions={
+          <Link href="/platform/tenants/nuevo" className={buttonVariants()}>
+            Nuevo tenant
+          </Link>
+        }
+      />
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
       {pendientes.length > 0 && (
-        <p className="mt-4 rounded-lg border border-primary/30 bg-primary/10 px-3.5 py-2.5 text-sm">
-          {pendientes.length === 1
-            ? 'Hay 1 registro pendiente de aprobación.'
-            : `Hay ${pendientes.length} registros pendientes de aprobación.`}
-        </p>
+        <Link
+          href="/platform/solicitudes"
+          className="mt-5 flex items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-3.5 py-2.5 text-sm transition-colors hover:bg-primary/15"
+        >
+          <span>
+            {pendientes.length === 1
+              ? 'Hay 1 solicitud pendiente de aprobación.'
+              : `Hay ${pendientes.length} solicitudes pendientes de aprobación.`}
+          </span>
+          <span className="font-medium text-primary">Revisar →</span>
+        </Link>
       )}
 
       <Table className="mt-6">
@@ -155,14 +167,13 @@ export default function PlatformDashboardPage() {
               </TableCell>
               <TableCell className="text-right">
                 {t.estado === 'PENDIENTE' ? (
-                  <Button
-                    size="sm"
-                    disabled={updatingId === t.id}
-                    onClick={() => cambiarEstado(t.id, 'ACTIVO')}
+                  <Link
+                    href="/platform/solicitudes"
+                    className={buttonVariants({ size: 'sm' })}
                   >
-                    Aprobar
-                  </Button>
-                ) : t.estado === 'SUSPENDIDO' ? (
+                    Revisar solicitud
+                  </Link>
+                ) : t.estado === 'SUSPENDIDO' || t.estado === 'RECHAZADO' ? (
                   <Button
                     variant="outline"
                     size="sm"

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { Venta } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -40,20 +41,22 @@ export default function VentasPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Ventas</h1>
-        <div className="flex gap-2">
-          <Link href="/ventas/contratos" className={buttonVariants({ variant: 'outline' })}>
-            Contratos
-          </Link>
-          <Link href="/ventas/compradores" className={buttonVariants({ variant: 'outline' })}>
-            Compradores
-          </Link>
-          <Link href="/ventas/nueva" className={buttonVariants()}>
-            Nueva venta
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Ventas"
+        actions={
+          <div className="flex gap-2">
+            <Link href="/ventas/contratos" className={buttonVariants({ variant: 'outline' })}>
+              Contratos
+            </Link>
+            <Link href="/ventas/compradores" className={buttonVariants({ variant: 'outline' })}>
+              Compradores
+            </Link>
+            <Link href="/ventas/nueva" className={buttonVariants()}>
+              Nueva venta
+            </Link>
+          </div>
+        }
+      />
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 

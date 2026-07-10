@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PuntoCompra, Recepcion } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -72,11 +73,10 @@ export default function NuevoSecadoPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Nuevo proceso de secado</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Selecciona las recepciones de café mojado que entran a secar. Cada recepción se consume
-        por completo.
-      </p>
+      <PageHeader
+        title="Nuevo proceso de secado"
+        description="Selecciona las recepciones de café mojado que entran a secar. Cada recepción se consume por completo."
+      />
 
       <form onSubmit={onSubmit} className="mt-6 flex max-w-xl flex-col gap-4">
         <div className="flex flex-col gap-1.5">

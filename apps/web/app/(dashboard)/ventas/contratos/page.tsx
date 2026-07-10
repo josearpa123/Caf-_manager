@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { ContratoVenta } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import {
@@ -54,21 +55,20 @@ export default function ContratosVentaPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Contratos de venta anticipada</h1>
-        <div className="flex gap-2">
-          <Link href="/ventas" className={buttonVariants({ variant: 'outline' })}>
-            Volver a ventas
-          </Link>
-          <Link href="/ventas/contratos/nuevo" className={buttonVariants()}>
-            Nuevo contrato
-          </Link>
-        </div>
-      </div>
-      <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-        Precio fijado hoy con una trilladora/comprador para cantidad futura. Las ventas que se
-        registren contra un contrato heredan su precio y descuentan del saldo pactado.
-      </p>
+      <PageHeader
+        title="Contratos de venta anticipada"
+        description="Precio fijado hoy con una trilladora/comprador para cantidad futura. Las ventas que se registren contra un contrato heredan su precio y descuentan del saldo pactado."
+        actions={
+          <div className="flex gap-2">
+            <Link href="/ventas" className={buttonVariants({ variant: 'outline' })}>
+              Volver a ventas
+            </Link>
+            <Link href="/ventas/contratos/nuevo" className={buttonVariants()}>
+              Nuevo contrato
+            </Link>
+          </div>
+        }
+      />
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 

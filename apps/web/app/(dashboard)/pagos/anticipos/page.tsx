@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { Anticipo } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import {
   Table,
@@ -40,17 +41,19 @@ export default function AnticiposPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Anticipos a proveedores</h1>
-        <div className="flex gap-2">
-          <Link href="/pagos" className={buttonVariants({ variant: 'outline' })}>
-            Volver a pagos
-          </Link>
-          <Link href="/pagos/anticipos/nuevo" className={buttonVariants()}>
-            Nuevo anticipo
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Anticipos a proveedores"
+        actions={
+          <div className="flex gap-2">
+            <Link href="/pagos" className={buttonVariants({ variant: 'outline' })}>
+              Volver a pagos
+            </Link>
+            <Link href="/pagos/anticipos/nuevo" className={buttonVariants()}>
+              Nuevo anticipo
+            </Link>
+          </div>
+        }
+      />
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 

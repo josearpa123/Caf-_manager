@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { DefectoTipo, Proveedor, PuntoCompra } from '@coffee-manager/shared-types';
 import { TipoCafeRecepcion, ModoFactorRendimiento } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -141,7 +142,7 @@ export default function NuevaRecepcionPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Nueva recepción</h1>
+      <PageHeader title="Nueva recepción" />
 
       <form onSubmit={onSubmit} className="mt-6 flex max-w-2xl flex-col gap-6">
         <div className="flex gap-2">

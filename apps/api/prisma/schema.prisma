@@ -19,6 +19,9 @@ enum EstadoTenant {
   // aprueba un admin de plataforma. No puede iniciar sesión en este estado
   // (ver AuthService.login/.refresh).
   PENDIENTE
+  // Solicitud de autorregistro que un admin de plataforma decidió no
+  // aprobar. Igual que PENDIENTE, no puede iniciar sesión.
+  RECHAZADO
 }
 
 enum TipoIdentificacion {

@@ -47,6 +47,7 @@ export class RegistroService {
             nombre: dto.nombreTenant,
             nit: dto.nit,
             planId: dto.planId,
+            telefono: dto.adminTelefono,
             estado: EstadoTenant.PENDIENTE,
           },
         });
@@ -68,6 +69,7 @@ export class RegistroService {
             tenantId: tenant.id,
             email: dto.adminEmail,
             nombre: dto.adminNombre,
+            telefono: dto.adminTelefono,
             passwordHash,
           },
         });

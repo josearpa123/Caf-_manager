@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Info } from 'lucide-react';
 import type { Factura } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import {
@@ -56,12 +57,14 @@ export default function FacturacionPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Facturación electrónica</h1>
-        <Link href="/facturacion/nueva" className={buttonVariants()}>
-          Generar factura
-        </Link>
-      </div>
+      <PageHeader
+        title="Facturación electrónica"
+        actions={
+          <Link href="/facturacion/nueva" className={buttonVariants()}>
+            Generar factura
+          </Link>
+        }
+      />
       <div className="mt-4 flex max-w-2xl items-start gap-2.5 rounded-lg border border-warning/30 bg-warning/10 px-3.5 py-3 text-sm">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
         <p className="text-foreground/80">

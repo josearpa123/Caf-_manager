@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import type { Venta } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 function formatMoney(value: string) {
@@ -42,10 +43,10 @@ export default function VentaDetallePage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">{venta.codigo}</h1>
-      <p className="text-sm text-muted-foreground">
-        {new Date(venta.fecha).toLocaleString('es-CO')}
-      </p>
+      <PageHeader
+        title={venta.codigo}
+        description={new Date(venta.fecha).toLocaleString('es-CO')}
+      />
 
       <Card className="mt-6 max-w-2xl">
         <CardHeader>

@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { Plan } from '@coffee-manager/shared-types';
 import { platformApi, ApiError } from '@/lib/platform-api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -66,11 +67,10 @@ export default function PlanesPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Planes</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Definen los límites de uso que se pueden asignar a un tenant (usuarios y puntos de
-        compra). Un tenant sin plan asignado no tiene límite.
-      </p>
+      <PageHeader
+        title="Planes"
+        description="Definen los límites de uso que se pueden asignar a un tenant (usuarios y puntos de compra). Un tenant sin plan asignado no tiene límite."
+      />
 
       <form onSubmit={onSubmit} className="mt-6 flex max-w-2xl items-end gap-3 rounded-md border p-4">
         <div className="flex flex-col gap-1.5">

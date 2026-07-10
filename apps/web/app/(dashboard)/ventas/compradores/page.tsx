@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { Comprador } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -81,7 +82,7 @@ export default function CompradoresPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Compradores</h1>
+      <PageHeader title="Compradores" />
 
       <form
         onSubmit={onSubmit}

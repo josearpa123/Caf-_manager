@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { Pago } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -46,20 +47,22 @@ export default function PagosPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Pagos y finanzas</h1>
-        <div className="flex gap-2">
-          <Link href="/pagos/cuenta" className={buttonVariants({ variant: 'outline' })}>
-            Estado de cuenta
-          </Link>
-          <Link href="/pagos/anticipos" className={buttonVariants({ variant: 'outline' })}>
-            Anticipos
-          </Link>
-          <Link href="/pagos/nuevo" className={buttonVariants()}>
-            Nuevo pago
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Pagos y finanzas"
+        actions={
+          <div className="flex gap-2">
+            <Link href="/pagos/cuenta" className={buttonVariants({ variant: 'outline' })}>
+              Estado de cuenta
+            </Link>
+            <Link href="/pagos/anticipos" className={buttonVariants({ variant: 'outline' })}>
+              Anticipos
+            </Link>
+            <Link href="/pagos/nuevo" className={buttonVariants()}>
+              Nuevo pago
+            </Link>
+          </div>
+        }
+      />
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 

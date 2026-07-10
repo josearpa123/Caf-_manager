@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { EstadoCuentaProveedor, Proveedor } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
@@ -50,12 +51,10 @@ export default function EstadoCuentaPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Estado de cuenta por proveedor</h1>
-      <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-        Resumen informativo a partir de compras, pagos y anticipos. La reconciliación entre
-        anticipos y compras es manual, así que el saldo estimado es una referencia, no un valor
-        autoritativo.
-      </p>
+      <PageHeader
+        title="Estado de cuenta por proveedor"
+        description="Resumen informativo a partir de compras, pagos y anticipos. La reconciliación entre anticipos y compras es manual, así que el saldo estimado es una referencia, no un valor autoritativo."
+      />
 
       <div className="mt-6 flex max-w-xs flex-col gap-1.5">
         <Label htmlFor="proveedorId">Proveedor</Label>

@@ -4,6 +4,29 @@
 
 **Última actualización:** 2026-07-10
 
+## Rediseño de dashboards + Solicitudes de registro (sesión 2026-07-10, continuación)
+
+Dos pedidos del usuario en la misma pasada: (1) llevar el mismo nivel de diseño de la landing a las dashboards internas (tenant y plataforma), y (2) en el panel de plataforma, una sección dedicada de "Solicitudes" donde aparezca cada autorregistro con su info completa y se pueda aprobar o rechazar.
+
+- **Schema**: nuevo valor `RECHAZADO` en `EstadoTenant` (migración `20260710213817_add_estado_rechazado`) — bloquea login igual que `PENDIENTE`/`SUSPENDIDO`, vía el mismo `assertTenantAccesible()`. Esto resuelve el "fuera de alcance" de la sesión anterior ("no hay acción de rechazar").
+- **Backend**:
+  - `RegistrarTenantDto` acepta `adminTelefono` opcional; se guarda tanto en `User.telefono` como en `Tenant.telefono` (antes ningún registro capturaba teléfono de contacto).
+  - `PlatformService.listTenants()` ahora incluye `contacto: { nombre, email, telefono }` — el primer usuario creado en la transacción de alta (admin que se registró o para quien se creó el tenant manualmente), sin necesidad de endpoint nuevo. `PATCH /platform/tenants/:id` ya soportaba cualquier valor del enum `estado`, así que `RECHAZADO` funciona sin tocar el controller.
+  - Verificado con curl: registro con teléfono → aparece en `/platform/tenants` con `contacto` completo → aprobado con plan asignado en el mismo request.
+- **Frontend**:
+  - Componentes nuevos compartidos: `components/shell/app-shell.tsx` (sidebar unificado, antes duplicado casi textual entre `(dashboard)/layout.tsx` y `platform/layout.tsx` — ahora un solo componente con `font-display` en la marca, indicador de sección activa con acento lateral, badges de conteo), `components/shell/page-header.tsx` (título+descripción+acciones consistente) y `components/shell/stat-card.tsx` (tarjeta KPI, reemplaza la copia local que tenía `reportes/page.tsx`). `components/ui/dialog.tsx` — modal ligero sin dependencias nuevas (no hay Radix en el proyecto), con Escape/click-afuera para cerrar.
+  - **`/platform/solicitudes`** (página nueva): tarjetas por cada tenant `PENDIENTE` con contacto (nombre/email/teléfono), NIT, fecha, selector de plan a asignar, y botones Aprobar/Rechazar que abren un `Dialog` de confirmación antes de aplicar el cambio. Nav del panel de plataforma con ítem "Solicitudes" y badge con el conteo de pendientes.
+  - `/platform/page.tsx` (Tenants) simplificado: ya no tiene el botón "Aprobar" inline (se movió a Solicitudes) — un tenant `PENDIENTE` muestra "Revisar solicitud" que enlaza allá; `RECHAZADO` se puede reactivar con el mismo botón "Activar" que ya existía para `SUSPENDIDO`.
+  - **Barrido de las ~34 páginas internas restantes** (bodega, recepción, ventas, pagos, facturación, configuración, y el resto de plataforma): headers `<h1 className="text-2xl font-semibold">` migrados a `<PageHeader>` — visual únicamente, sin tocar lógica de negocio ni estructura de tablas. `pagos/cuenta/page.tsx` quedó con su `StatCard` local sin consolidar (no era parte de esta pasada).
+  - `app/(auth)/register/page.tsx` — nuevo campo opcional "Teléfono de contacto".
+  - `packages/shared-types`: `EstadoTenant.RECHAZADO`, `PlatformTenant.telefono` + `PlatformTenant.contacto`.
+  - Verificado con `pnpm --filter web build` limpio (38 rutas, sin errores nuevos) y con curl end-to-end: registro nuevo → aparece en `/platform/tenants` con `contacto`/`telefono` → visible como pendiente. **No se probó visualmente en navegador** (mismo límite de siempre, sin herramienta de automatización disponible).
+
+### Pendiente / fuera de alcance
+- "Dar permisos" al aprobar no tiene un control granular nuevo: el rol "Administrador" que se crea en el registro ya tiene *todos* los permisos dentro de su tenant (así funcionaba desde antes) — lo único que la aprobación controla de verdad es el `estado` y el `plan` (que fija `maxUsuarios`/`maxPuntosCompra`). Si en el futuro se quiere que el plan también limite *qué módulos* puede ver un tenant (no solo cuántos usuarios/puntos de compra), es una feature nueva, no estaba pedida explícitamente esta vez.
+- Sin motivo de rechazo persistido (el enum solo guarda el estado, no un texto con la razón) — si hace falta auditar por qué se rechazó algo, hoy solo queda en `AuditLog` genérico (el modelo `Tenant` está en `AUDITED_MODELS`), no en un campo dedicado.
+- Sin notificación por correo al aprobar/rechazar (mismo pendiente de la sesión anterior, sigue sin haber servicio de email).
+
 ## Landing page pública + autorregistro con aprobación (sesión 2026-07-10)
 
 Pedido del usuario: una página principal pública (Inicio/Sobre nosotros/Planes) con los logins visibles, y que el registro esté habilitado pero la cuenta quede pendiente de activación — la aprueba un admin de plataforma según el plan. Esto reemplaza la decisión anterior de la Fase 1 ("onboarding manual por diseño, `/register` placeholder") — ahora hay dos caminos: autorregistro público (pendiente de aprobación) o alta manual desde `/platform/tenants/nuevo`, conviven sin conflicto.
@@ -17,12 +40,12 @@ Pedido del usuario: una página principal pública (Inicio/Sobre nosotros/Planes
 - **Frontend**:
   - `app/page.tsx` (raíz) reemplazado: antes redirigía siempre a `/login` o `/proveedores`; ahora, si no hay sesión, muestra una landing real (hero, características, "Sobre nosotros", "Planes" con los datos de `/registro/planes`, CTA) con botones **Ingresar** y **Crear cuenta** en el header, y un link discreto a `/platform/login` en el footer (no se promociona al público general). Si hay sesión activa, sigue redirigiendo al dashboard como antes.
   - `app/(auth)/register/page.tsx` — antes placeholder, ahora formulario real (nombre del negocio, NIT opcional, datos del admin con `PasswordInput`, plan opcional) que llama a `POST /registro` y muestra el mensaje de "pendiente de aprobación" en vez de loguear automáticamente.
-  - `app/platform/page.tsx` — Badge nuevo para `PENDIENTE`, los tenants pendientes se listan primero, aviso visible cuando hay alguno, y botón **Aprobar** (en vez de Activar/Suspender) cuando el estado es `PENDIENTE`.
+  - `app/platform/page.tsx` — Badge nuevo para `PENDIENTE`, los tenants pendientes se listan primero, aviso visible cuando hay alguno. *(Actualización: el botón de aprobar/rechazar en sí se movió a `/platform/solicitudes` en la sesión siguiente, ver sección "Rediseño de dashboards + Solicitudes de registro" más arriba.)*
   - `packages/shared-types`: `EstadoTenant.PENDIENTE` + `PlanPublico` (forma reducida de `Plan` para el endpoint público).
 
 ### Pendiente / fuera de alcance
 - Sin envío de correo al aprobar/registrar (no hay servicio de email integrado en el proyecto) — el usuario se entera revisando `/platform` manualmente, o el interesado reintentando login.
-- No hay acción de "rechazar" un registro pendiente (solo aprobar vía cambio de estado) — si hace falta, se resuelve dejándolo `PENDIENTE` indefinidamente o reutilizando `SUSPENDIDO`.
+- ~~No hay acción de "rechazar" un registro pendiente~~ — resuelto en la sesión siguiente con `EstadoTenant.RECHAZADO`, ver sección "Rediseño de dashboards + Solicitudes de registro" más arriba.
 - El copy de "Sobre nosotros" es un placeholder razonable centrado en el producto (no tengo la historia real de la empresa) — se edita directamente en `app/page.tsx` cuando haya contenido de marca definitivo.
 
 ## Contratos de venta anticipada (sesión 2026-07-10)

@@ -54,6 +54,11 @@ export class AuthService {
         'Esta cuenta está pendiente de aprobación. Un administrador la activará pronto.',
       );
     }
+    if (estado === EstadoTenant.RECHAZADO) {
+      throw new UnauthorizedException(
+        'Esta solicitud de cuenta no fue aprobada. Contacte al administrador.',
+      );
+    }
   }
 
   private signAccessToken(payload: TenantJwtPayload): string {

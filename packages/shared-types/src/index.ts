@@ -7,6 +7,7 @@ export const EstadoTenant = {
   SUSPENDIDO: 'SUSPENDIDO',
   PRUEBA: 'PRUEBA',
   PENDIENTE: 'PENDIENTE',
+  RECHAZADO: 'RECHAZADO',
 } as const;
 export type EstadoTenant = (typeof EstadoTenant)[keyof typeof EstadoTenant];
 
@@ -425,10 +426,12 @@ export interface PlatformTenant {
   id: string;
   nombre: string;
   nit: string | null;
+  telefono: string | null;
   estado: EstadoTenant;
   createdAt: string;
   plan: Plan | null;
   _count: { users: number; puntosCompra: number };
+  contacto: { nombre: string; email: string; telefono: string | null } | null;
 }
 
 export interface Factura {

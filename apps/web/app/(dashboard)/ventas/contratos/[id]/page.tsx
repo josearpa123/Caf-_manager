@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import type { ContratoVenta } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -73,24 +74,26 @@ export default function ContratoVentaDetallePage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">{contrato.codigo}</h1>
-          <Badge variant={ESTADO_VARIANT[contrato.estado] ?? 'neutral'}>
-            {ESTADO_LABEL[contrato.estado] ?? contrato.estado}
-          </Badge>
-          {contrato.vencido && <Badge variant="warning">Vencido</Badge>}
-        </div>
-        {contrato.estado === 'VIGENTE' && contrato.saldoPendienteKg > 0 && (
-          <Link
-            href={`/ventas/nueva?contratoVentaId=${contrato.id}`}
-            className={buttonVariants()}
-          >
-            Registrar entrega
-          </Link>
-        )}
-      </div>
-      <p className="text-sm text-muted-foreground">{contrato.compradorNombre}</p>
+      <PageHeader
+        title={contrato.codigo}
+        description={contrato.compradorNombre}
+        actions={
+          <div className="flex items-center gap-2">
+            <Badge variant={ESTADO_VARIANT[contrato.estado] ?? 'neutral'}>
+              {ESTADO_LABEL[contrato.estado] ?? contrato.estado}
+            </Badge>
+            {contrato.vencido && <Badge variant="warning">Vencido</Badge>}
+            {contrato.estado === 'VIGENTE' && contrato.saldoPendienteKg > 0 && (
+              <Link
+                href={`/ventas/nueva?contratoVentaId=${contrato.id}`}
+                className={buttonVariants()}
+              >
+                Registrar entrega
+              </Link>
+            )}
+          </div>
+        }
+      />
 
       <Card className="mt-6 max-w-xl">
         <CardHeader>

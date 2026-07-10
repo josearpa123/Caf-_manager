@@ -16,6 +16,9 @@ build/
 .env.*.local
 !.env.example
 
+# Credenciales locales (nunca se suben)
+.credenciales-dev
+
 # Prisma
 apps/api/prisma/migrations/dev/
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { Recepcion } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -42,17 +43,19 @@ export default function RecepcionPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Recepción de café</h1>
-        <div className="flex gap-2">
-          <Link href="/recepcion/precios" className={buttonVariants({ variant: 'outline' })}>
-            Tabla de precios
-          </Link>
-          <Link href="/recepcion/nueva" className={buttonVariants()}>
-            Nueva recepción
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Recepción de café"
+        actions={
+          <div className="flex gap-2">
+            <Link href="/recepcion/precios" className={buttonVariants({ variant: 'outline' })}>
+              Tabla de precios
+            </Link>
+            <Link href="/recepcion/nueva" className={buttonVariants()}>
+              Nueva recepción
+            </Link>
+          </div>
+        }
+      />
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 

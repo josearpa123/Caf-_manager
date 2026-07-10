@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { Proveedor, PuntoCompra, Recepcion } from '@coffee-manager/shared-types';
 import { MetodoPago } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -88,7 +89,7 @@ export default function NuevoPagoPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Nuevo pago</h1>
+      <PageHeader title="Nuevo pago" />
 
       <form onSubmit={onSubmit} className="mt-6 flex max-w-xl flex-col gap-6">
         <div className="grid grid-cols-2 gap-4">

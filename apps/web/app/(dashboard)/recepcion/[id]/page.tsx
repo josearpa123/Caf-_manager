@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import type { Recepcion } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 function formatMoney(value: string) {
@@ -44,10 +45,10 @@ export default function RecepcionDetallePage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">{recepcion.codigo}</h1>
-      <p className="text-sm text-muted-foreground">
-        {new Date(recepcion.fecha).toLocaleString('es-CO')}
-      </p>
+      <PageHeader
+        title={recepcion.codigo}
+        description={new Date(recepcion.fecha).toLocaleString('es-CO')}
+      />
 
       <Card className="mt-6 max-w-2xl">
         <CardHeader>

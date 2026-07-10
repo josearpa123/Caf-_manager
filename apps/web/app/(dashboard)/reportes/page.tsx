@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 import type { PuntoCompra, ReportesDashboard } from '@coffee-manager/shared-types';
 import { api, ApiError, getToken } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
+import { StatCard } from '@/components/shell/stat-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,17 +31,6 @@ function formatMoney(value: number) {
     currency: 'COP',
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-1 text-xl font-semibold">{value}</p>
-      </CardContent>
-    </Card>
-  );
 }
 
 export default function ReportesPage() {
@@ -105,19 +96,21 @@ export default function ReportesPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Reportes</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => exportar('csv')} disabled={exportando !== null}>
-            <Download className="h-4 w-4" />
-            {exportando === 'csv' ? 'Exportando…' : 'Detalle de compras (CSV)'}
-          </Button>
-          <Button onClick={() => exportar('excel')} disabled={exportando !== null}>
-            <Download className="h-4 w-4" />
-            {exportando === 'excel' ? 'Exportando…' : 'Exportar a Excel'}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Reportes"
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => exportar('csv')} disabled={exportando !== null}>
+              <Download className="h-4 w-4" />
+              {exportando === 'csv' ? 'Exportando…' : 'Detalle de compras (CSV)'}
+            </Button>
+            <Button onClick={() => exportar('excel')} disabled={exportando !== null}>
+              <Download className="h-4 w-4" />
+              {exportando === 'excel' ? 'Exportando…' : 'Exportar a Excel'}
+            </Button>
+          </div>
+        }
+      />
 
       <div className="mt-6 flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">

@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import type { ProcesoSecado } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,8 +51,7 @@ export default function SecadoDetallePage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">{proceso.codigo}</h1>
-      <p className="text-sm text-muted-foreground">{proceso.puntoCompra.nombre}</p>
+      <PageHeader title={proceso.codigo} description={proceso.puntoCompra.nombre} />
 
       <Card className="mt-6 max-w-xl">
         <CardHeader>

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import type { Proveedor } from '@coffee-manager/shared-types';
 import type { ProveedorFormValues } from '@coffee-manager/validation-schemas';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { ProveedorForm } from '@/components/proveedores/proveedor-form';
 
 export default function EditarProveedorPage() {
@@ -39,7 +40,7 @@ export default function EditarProveedorPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Editar proveedor</h1>
+      <PageHeader title="Editar proveedor" />
       <div className="mt-6">
         {loadError && <p className="text-sm text-destructive">{loadError}</p>}
         {!loadError && !proveedor && (

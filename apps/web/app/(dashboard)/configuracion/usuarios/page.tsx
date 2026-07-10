@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { PuntoCompra, Role, User } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
@@ -105,7 +106,7 @@ export default function UsuariosPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Usuarios</h1>
+      <PageHeader title="Usuarios" />
 
       <form onSubmit={onSubmit} className="mt-6 max-w-2xl rounded-md border p-4">
         <div className="grid grid-cols-2 gap-4">

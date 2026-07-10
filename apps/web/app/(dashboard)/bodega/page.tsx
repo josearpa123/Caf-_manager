@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { InventarioItem, Recepcion } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -57,17 +58,19 @@ export default function BodegaPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Bodega e inventario</h1>
-        <div className="flex gap-2">
-          <Link href="/bodega/secado" className={buttonVariants({ variant: 'outline' })}>
-            Secado
-          </Link>
-          <Link href="/bodega/trilla" className={buttonVariants({ variant: 'outline' })}>
-            Trilla
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Bodega e inventario"
+        actions={
+          <div className="flex gap-2">
+            <Link href="/bodega/secado" className={buttonVariants({ variant: 'outline' })}>
+              Secado
+            </Link>
+            <Link href="/bodega/trilla" className={buttonVariants({ variant: 'outline' })}>
+              Trilla
+            </Link>
+          </div>
+        }
+      />
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 

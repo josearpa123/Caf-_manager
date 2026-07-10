@@ -61,18 +61,32 @@ export class PlatformService {
   }
 
   async listTenants() {
-    return this.prisma.tenant.findMany({
+    const tenants = await this.prisma.tenant.findMany({
       select: {
         id: true,
         nombre: true,
         nit: true,
+        telefono: true,
         estado: true,
         createdAt: true,
         plan: true,
         _count: { select: { users: true, puntosCompra: true } },
+        users: {
+          take: 1,
+          orderBy: { createdAt: 'asc' },
+          select: { nombre: true, email: true, telefono: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    // El primer usuario creado (transacción de alta) es siempre el admin
+    // que registró o para quien se creó el tenant — lo exponemos como
+    // "contacto" para la revisión de solicitudes, sin anidar la relación.
+    return tenants.map(({ users, ...tenant }) => ({
+      ...tenant,
+      contacto: users[0] ?? null,
+    }));
   }
 
   async updateTenant(id: string, dto: UpdateTenantPlatformDto) {

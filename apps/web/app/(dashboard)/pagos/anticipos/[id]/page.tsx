@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import type { AnticipoDetalle, Pago, Recepcion } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -89,10 +90,10 @@ export default function AnticipoDetallePage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Anticipo — {anticipo.proveedor.nombre}</h1>
-      <p className="text-sm text-muted-foreground">
-        {new Date(anticipo.fecha).toLocaleString('es-CO')} · {anticipo.puntoCompra.nombre}
-      </p>
+      <PageHeader
+        title={`Anticipo — ${anticipo.proveedor.nombre}`}
+        description={`${new Date(anticipo.fecha).toLocaleString('es-CO')} · ${anticipo.puntoCompra.nombre}`}
+      />
 
       <Card className="mt-6 max-w-xl">
         <CardHeader>

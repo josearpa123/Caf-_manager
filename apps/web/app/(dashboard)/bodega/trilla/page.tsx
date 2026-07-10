@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { PuntoCompra, TrillaProceso } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -81,10 +82,10 @@ export default function TrillaPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Trilla</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Consume pergamino disponible en el punto de compra y genera almendra.
-      </p>
+      <PageHeader
+        title="Trilla"
+        description="Consume pergamino disponible en el punto de compra y genera almendra."
+      />
 
       <form onSubmit={onSubmit} className="mt-6 grid max-w-2xl grid-cols-2 gap-4">
         <div className="col-span-2 flex flex-col gap-1.5">

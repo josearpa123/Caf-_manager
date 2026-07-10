@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Factura, Recepcion } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
@@ -44,12 +45,10 @@ export default function NuevaFacturaPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Generar factura</h1>
-      <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-        Se crea el registro de la factura (1 por recepción). La emisión real ante la DIAN se hace
-        después, desde el detalle, y hoy fallará con un mensaje claro porque no hay proveedor
-        tecnológico conectado.
-      </p>
+      <PageHeader
+        title="Generar factura"
+        description="Se crea el registro de la factura (1 por recepción). La emisión real ante la DIAN se hace después, desde el detalle, y hoy fallará con un mensaje claro porque no hay proveedor tecnológico conectado."
+      />
 
       <form onSubmit={onSubmit} className="mt-6 flex max-w-md flex-col gap-4">
         <div className="flex flex-col gap-1.5">

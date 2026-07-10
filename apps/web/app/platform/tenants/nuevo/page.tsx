@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Plan } from '@coffee-manager/shared-types';
 import { platformApi, ApiError } from '@/lib/platform-api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
@@ -57,11 +58,12 @@ export default function NuevoTenantPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Nuevo tenant</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Crea el negocio y su primer usuario administrador (rol &quot;Administrador&quot; con
-        todos los permisos).
-      </p>
+      <PageHeader
+        title="Nuevo tenant"
+        description={
+          'Crea el negocio y su primer usuario administrador (rol "Administrador" con todos los permisos).'
+        }
+      />
 
       <form onSubmit={onSubmit} className="mt-6 flex max-w-xl flex-col gap-6">
         <div className="grid grid-cols-2 gap-4">

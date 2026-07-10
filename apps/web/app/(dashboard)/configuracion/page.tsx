@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { TenantSelf } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
 
@@ -40,7 +41,7 @@ export default function ConfiguracionPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Configuración</h1>
+      <PageHeader title="Configuración" />
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 

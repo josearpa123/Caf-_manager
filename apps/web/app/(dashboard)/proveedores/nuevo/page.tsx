@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ProveedorFormValues } from '@coffee-manager/validation-schemas';
 import { api, ApiError } from '@/lib/api';
+import { PageHeader } from '@/components/shell/page-header';
 import { ProveedorForm } from '@/components/proveedores/proveedor-form';
 
 export default function NuevoProveedorPage() {
@@ -24,7 +25,7 @@ export default function NuevoProveedorPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Nuevo proveedor</h1>
+      <PageHeader title="Nuevo proveedor" />
       <div className="mt-6">
         <ProveedorForm onSubmit={onSubmit} submitLabel="Crear proveedor" serverError={serverError} />
       </div>
