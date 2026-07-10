@@ -19,7 +19,7 @@ export default function AuthLayout({
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Coffee className="h-5 w-5" />
           </span>
-          <span className="text-lg font-semibold tracking-tight">Coffee Manager</span>
+          <span className="font-display text-lg tracking-tight">Coffee Manager</span>
         </div>
         <div className="w-full">{children}</div>
       </div>

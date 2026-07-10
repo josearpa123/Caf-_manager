@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Calistoga } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 
@@ -12,6 +13,14 @@ const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff",
   variable: "--font-geist-mono",
   weight: "100 900",
+});
+// Serif con carácter para titulares de la landing/marketing — le da voz
+// propia frente al resto del producto (que usa Geist, geométrica y neutra
+// a propósito para el dashboard interno).
+const calistoga = Calistoga({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-display",
 });
 
 export const metadata: Metadata = {
@@ -27,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${calistoga.variable} antialiased`}
       >
         <AuthProvider>{children}</AuthProvider>
       </body>
