@@ -4,6 +4,18 @@
 
 **Última actualización:** 2026-07-10
 
+## Rediseño visual del frontend (sesión 2026-07-10, con skill de diseño UI/UX)
+
+A petición del usuario: mejorar el diseño en general + detalle puntual del ojo para mostrar/ocultar contraseña. Alcance: solo visual/UX, sin cambios de backend ni de flujos.
+
+- **Tokens** (`app/globals.css`, `tailwind.config.ts`): el color primario café/terracota ya existía (buena base) pero los neutrales eran fríos (slate) y desentonaban — ahora toda la paleta es "warm" y coherente. Se agregaron tokens `success`/`warning` (antes solo había `destructive`).
+- **Primitivas nuevas** en `components/ui/`: `Badge` (estados con color semántico), `PasswordInput` (toggle mostrar/ocultar con iconos `Eye`/`EyeOff` de `lucide-react`, que ya estaba en dependencias), `Table`/`TableHeader`/`TableRow`/`TableCell`/`TableEmpty` (header, hover de fila, y empty state consistentes en todos lados). `Button`/`Input`/`Select` pulidos (focus rings, transiciones, cursor-pointer, feedback de presión).
+- **Sidebars** del dashboard del tenant y del panel de plataforma rediseñados con iconos por sección (lucide), estado activo con acento de color, avatar con iniciales, logout como botón de ícono.
+- **Barrido completo** de los ~16 listados con tabla en toda la app (proveedores, recepción×2, bodega×3, pagos×2, ventas×2, configuración×2, plataforma×2, facturación, reportes×2): tablas raw → componente `Table`; texto plano de estado ("Activo"/"Pendiente"/etc.) → `Badge`. Helper compartido `lib/badge-variants.ts` para mapear tipo de café → color de badge de forma consistente.
+- **Toggle de contraseña** aplicado en los 4 formularios que la piden: login de tenant, login de plataforma, crear usuario (`/configuracion/usuarios`), crear tenant (`/platform/tenants/nuevo`).
+- Corregido de paso: `/recepcion/precios` tenía un texto desactualizado ("solo aplica a café mojado") que quedó mal después de la corrección de dominio de la sesión anterior (ahora dice pergamino).
+- Verificado con `next build` limpio y arrancando el dev server real (curl a todas las rutas → 200, HTML de `/login` confirmado con el nuevo copy y el botón "Mostrar contraseña" presente). **No se probó visualmente en navegador** — sigue sin haber herramienta de automatización de navegador en este entorno; toda la verificación fue a nivel de build/HTML/tipos, no de captura visual.
+
 ## Fase actual (según cronograma en `docs/doc.md` §7.2)
 
 **FASE 2: Desarrollo del MVP — Sprint 3-4**
