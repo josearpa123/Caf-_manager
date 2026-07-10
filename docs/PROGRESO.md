@@ -4,6 +4,18 @@
 
 **Última actualización:** 2026-07-10
 
+## Exportar Excel en Reportes + sesión más larga con refresh silencioso (sesión 2026-07-10)
+
+Dos pedidos puntuales del usuario:
+
+**1. Exportar a Excel desde Reportes**: `GET /reportes/exportar` (`REPORTES_EXPORTAR`) genera un `.xlsx` real con `exceljs` (nueva dependencia en `apps/api`), no un CSV renombrado. 6 hojas: Resumen (KPIs + filtros aplicados), Compras por tipo, Ventas por tipo, Inventario actual, Saldo proveedores (con fila de total), y Detalle de compras (recepciones fila por fila, igual que el CSV existente pero dentro del mismo archivo). Reutiliza `ReportesService.dashboard()` para no duplicar la lógica de agregación. Frontend: botón "Exportar a Excel" junto al CSV existente (renombrado "Detalle de compras (CSV)" para diferenciarlos), mismo patrón fetch+blob+descarga. Verificado con curl: el archivo descargado es un `.xlsx` válido (`file` lo reconoce como "Microsoft Excel 2007+") con las 6 hojas esperadas.
+
+**2. Sesión demasiado corta**: el usuario reportó que lo sacaba a los ~15 min estando activo (cargando recepciones). Causa: el access token duraba 15 min y el frontend nunca usaba el refresh token que ya emitía el backend — solo lo guardaba para el logout. Arreglado sin tocar el modelo de seguridad (el access token sigue siendo corto a propósito):
+- `lib/api.ts`: cualquier request que reciba 401 ahora intenta renovar con `POST /auth/refresh` usando el refresh token guardado, y si funciona reintenta la petición original una vez — todo transparente para el usuario. Con múltiples peticiones 401 casi simultáneas (ej. volver de segundo plano), se comparte un único intento de refresh en vuelo (`refreshInFlight`) para no pisarse el refresh token, que es de un solo uso. Si el refresh también falla (token vencido/revocado — a los 30 días de inactividad real), dispara un evento `auth:session-expired` que `AuthProvider` escucha para limpiar la sesión y mandar a `/login`.
+- `lib/auth.tsx`: ya no maneja el refresh token por su cuenta, usa los helpers centralizados de `api.ts` (`getRefreshToken`/`setRefreshToken`/`clearRefreshToken`).
+- Backend: `JWT_ACCESS_EXPIRES_IN` subido de 15 a 30 min (colchón adicional, la renovación automática es el arreglo real). Plataforma (panel de super-admin) no tiene refresh token propio — es uso interno poco frecuente — así que en cambio se le subió el token a 8h (`JWT_PLATFORM_EXPIRES_IN`, nuevo). Verificado con curl: token de tenant dura 1800s, token de plataforma 28800s, y `/auth/refresh` rota correctamente el access+refresh token.
+- **Resultado esperado**: mientras el usuario tenga la pestaña abierta y siga usando la app (cualquier petición dispara la renovación si hace falta), la sesión no debería cortarse antes de los 30 días del refresh token. Solo se cierra sesión si el refresh también está vencido/revocado.
+
 ## Rediseño visual del frontend (sesión 2026-07-10, con skill de diseño UI/UX)
 
 A petición del usuario: mejorar el diseño en general + detalle puntual del ojo para mostrar/ocultar contraseña. Alcance: solo visual/UX, sin cambios de backend ni de flujos.

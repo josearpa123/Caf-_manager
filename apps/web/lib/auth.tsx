@@ -8,7 +8,15 @@ import {
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { api, clearToken, getToken, setToken } from './api';
+import {
+  api,
+  clearRefreshToken,
+  clearToken,
+  getRefreshToken,
+  getToken,
+  setRefreshToken,
+  setToken,
+} from './api';
 
 interface AuthUser {
   id: string;
@@ -33,7 +41,6 @@ interface AuthContextValue {
 }
 
 const USER_STORAGE_KEY = 'coffee-manager:user';
-const REFRESH_STORAGE_KEY = 'coffee-manager:refreshToken';
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -50,24 +57,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
+  // El cliente de API (lib/api.ts) renueva el access token en silencio con
+  // el refresh token ante cualquier 401 — así una sesión activa dura tanto
+  // como el refresh token (30 días por defecto), no los 30 minutos del
+  // access token. Este evento solo se dispara cuando el refresh token
+  // también venció/fue revocado, es decir, cuando de verdad hay que volver
+  // a loguearse.
+  useEffect(() => {
+    const onSessionExpired = () => {
+      window.localStorage.removeItem(USER_STORAGE_KEY);
+      setUser(null);
+      router.replace('/login');
+    };
+    window.addEventListener('auth:session-expired', onSessionExpired);
+    return () => window.removeEventListener('auth:session-expired', onSessionExpired);
+  }, [router]);
+
   const login = useCallback(async (email: string, password: string) => {
     const res = await api.post<LoginResponse>('/auth/login', {
       email,
       password,
     });
     setToken(res.accessToken);
-    window.localStorage.setItem(REFRESH_STORAGE_KEY, res.refreshToken);
+    setRefreshToken(res.refreshToken);
     window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(res.user));
     setUser(res.user);
   }, []);
 
   const logout = useCallback(() => {
-    const refreshToken = window.localStorage.getItem(REFRESH_STORAGE_KEY);
+    const refreshToken = getRefreshToken();
     if (refreshToken) {
       api.post('/auth/logout', { refreshToken }).catch(() => {});
     }
     clearToken();
-    window.localStorage.removeItem(REFRESH_STORAGE_KEY);
+    clearRefreshToken();
     window.localStorage.removeItem(USER_STORAGE_KEY);
     setUser(null);
     router.push('/login');

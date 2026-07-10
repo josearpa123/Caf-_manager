@@ -46,7 +46,7 @@ export class PlatformService {
     };
     const accessToken = this.jwt.sign(payload, {
       secret: this.config.get<string>('jwt.platformSecret'),
-      expiresIn: this.config.get<string>('jwt.accessExpiresIn'),
+      expiresIn: this.config.get<string>('jwt.platformExpiresIn'),
     });
 
     await this.prisma.platformAdmin.update({

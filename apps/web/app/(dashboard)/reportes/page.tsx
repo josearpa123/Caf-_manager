@@ -51,7 +51,7 @@ export default function ReportesPage() {
   const [data, setData] = useState<ReportesDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isExporting, setIsExporting] = useState(false);
+  const [exportando, setExportando] = useState<'excel' | 'csv' | null>(null);
 
   useEffect(() => {
     api.get<PuntoCompra[]>('/puntos-compra').then(setPuntosCompra).catch(() => {});
@@ -75,15 +75,17 @@ export default function ReportesPage() {
 
   useEffect(load, []);
 
-  const exportarCsv = async () => {
-    setIsExporting(true);
+  const exportar = async (tipo: 'excel' | 'csv') => {
+    setExportando(tipo);
     setError(null);
     try {
       const params = new URLSearchParams();
       if (puntoCompraId) params.set('puntoCompraId', puntoCompraId);
       if (desde) params.set('desde', desde);
       if (hasta) params.set('hasta', hasta);
-      const res = await fetch(`${API_URL}/reportes/compras/exportar?${params.toString()}`, {
+      const path = tipo === 'excel' ? '/reportes/exportar' : '/reportes/compras/exportar';
+      const filename = tipo === 'excel' ? 'reportes.xlsx' : 'compras.csv';
+      const res = await fetch(`${API_URL}${path}?${params.toString()}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (!res.ok) throw new Error('No se pudo exportar');
@@ -91,13 +93,13 @@ export default function ReportesPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'compras.csv';
+      a.download = filename;
       a.click();
       window.URL.revokeObjectURL(url);
     } catch {
-      setError('No se pudo exportar el CSV de compras');
+      setError(tipo === 'excel' ? 'No se pudo exportar el Excel' : 'No se pudo exportar el CSV de compras');
     } finally {
-      setIsExporting(false);
+      setExportando(null);
     }
   };
 
@@ -105,10 +107,16 @@ export default function ReportesPage() {
     <div className="p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Reportes</h1>
-        <Button variant="outline" onClick={exportarCsv} disabled={isExporting}>
-          <Download className="h-4 w-4" />
-          {isExporting ? 'Exportando…' : 'Exportar compras (CSV)'}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => exportar('csv')} disabled={exportando !== null}>
+            <Download className="h-4 w-4" />
+            {exportando === 'csv' ? 'Exportando…' : 'Detalle de compras (CSV)'}
+          </Button>
+          <Button onClick={() => exportar('excel')} disabled={exportando !== null}>
+            <Download className="h-4 w-4" />
+            {exportando === 'excel' ? 'Exportando…' : 'Exportar a Excel'}
+          </Button>
+        </div>
       </div>
 
       <div className="mt-6 flex flex-wrap items-end gap-3">

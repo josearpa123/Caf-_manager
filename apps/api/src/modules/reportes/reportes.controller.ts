@@ -23,4 +23,16 @@ export class ReportesController {
     res.setHeader('Content-Disposition', 'attachment; filename="compras.csv"');
     res.send(csv);
   }
+
+  @RequirePermissions(Permission.REPORTES_EXPORTAR)
+  @Get('exportar')
+  async exportarExcel(@Query() query: QueryReportesDto, @Res() res: Response) {
+    const buffer = await this.reportesService.exportarExcel(query);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', 'attachment; filename="reportes.xlsx"');
+    res.send(Buffer.from(buffer));
+  }
 }
