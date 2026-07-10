@@ -9,6 +9,36 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+
+// Kilogramos es la unidad base en todo el sistema (ver requerimientos.md).
+// La arroba es solo un formato de entrada/visualización en este formulario;
+// lo que se manda a la API siempre queda convertido a kg.
+const ARROBA_KG = 12.5;
+
+type Unidad = 'kg' | '@';
+
+function UnitToggle({ unidad, onChange }: { unidad: Unidad; onChange: (u: Unidad) => void }) {
+  return (
+    <div className="flex overflow-hidden rounded-md border text-xs">
+      {(['kg', '@'] as const).map((u) => (
+        <button
+          key={u}
+          type="button"
+          onClick={() => onChange(u)}
+          className={cn(
+            'px-2 py-1 font-medium transition-colors',
+            unidad === u
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-background text-muted-foreground hover:bg-accent',
+          )}
+        >
+          {u === 'kg' ? 'kg' : '@ (arroba)'}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function NuevoContratoVentaPage() {
   const router = useRouter();
@@ -20,8 +50,12 @@ export default function NuevoContratoVentaPage() {
   const [tipoCafe, setTipoCafe] = useState<string>(TipoInventario.PERGAMINO);
   const [compradorId, setCompradorId] = useState('');
   const [compradorNombre, setCompradorNombre] = useState('');
-  const [cantidadKgPactada, setCantidadKgPactada] = useState('');
-  const [precioKg, setPrecioKg] = useState('');
+
+  const [unidadCantidad, setUnidadCantidad] = useState<Unidad>('kg');
+  const [cantidad, setCantidad] = useState('');
+  const [unidadPrecio, setUnidadPrecio] = useState<Unidad>('kg');
+  const [precio, setPrecio] = useState('');
+
   const [fechaLimite, setFechaLimite] = useState('');
   const [observaciones, setObservaciones] = useState('');
 
@@ -39,11 +73,43 @@ export default function NuevoContratoVentaPage() {
     if (comprador) setCompradorNombre(comprador.nombre);
   };
 
+  // Al cambiar de unidad, convierte el número ya escrito para no perder el
+  // valor real (ej. 100 kg -> 8 @ en vez de quedar en "100 @").
+  const cambiarUnidadCantidad = (nueva: Unidad) => {
+    if (cantidad && !Number.isNaN(Number(cantidad))) {
+      const kg = unidadCantidad === '@' ? Number(cantidad) * ARROBA_KG : Number(cantidad);
+      setCantidad(nueva === '@' ? String(kg / ARROBA_KG) : String(kg));
+    }
+    setUnidadCantidad(nueva);
+  };
+
+  const cambiarUnidadPrecio = (nueva: Unidad) => {
+    if (precio && !Number.isNaN(Number(precio))) {
+      const porKg = unidadPrecio === '@' ? Number(precio) / ARROBA_KG : Number(precio);
+      setPrecio(nueva === '@' ? String(porKg * ARROBA_KG) : String(porKg));
+    }
+    setUnidadPrecio(nueva);
+  };
+
+  const cantidadKg =
+    cantidad && !Number.isNaN(Number(cantidad))
+      ? unidadCantidad === '@'
+        ? Number(cantidad) * ARROBA_KG
+        : Number(cantidad)
+      : null;
+
+  const precioKg =
+    precio && !Number.isNaN(Number(precio))
+      ? unidadPrecio === '@'
+        ? Number(precio) / ARROBA_KG
+        : Number(precio)
+      : null;
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!puntoCompraId || !compradorNombre || !cantidadKgPactada || !precioKg) {
+    if (!puntoCompraId || !compradorNombre || cantidadKg === null || precioKg === null) {
       setError('Completa punto de compra, comprador, cantidad y precio');
       return;
     }
@@ -55,8 +121,8 @@ export default function NuevoContratoVentaPage() {
         tipoCafe,
         compradorId: compradorId || undefined,
         compradorNombre,
-        cantidadKgPactada: Number(cantidadKgPactada),
-        precioKg: Number(precioKg),
+        cantidadKgPactada: Math.round(cantidadKg * 100) / 100,
+        precioKg: Math.round(precioKg * 100) / 100,
         fechaLimite: fechaLimite || undefined,
         observaciones: observaciones || undefined,
       });
@@ -134,38 +200,60 @@ export default function NuevoContratoVentaPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="cantidadKgPactada">Cantidad pactada (kg)</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="cantidad">Cantidad pactada</Label>
+              <UnitToggle unidad={unidadCantidad} onChange={cambiarUnidadCantidad} />
+            </div>
             <Input
-              id="cantidadKgPactada"
+              id="cantidad"
               type="number"
               step="0.01"
-              value={cantidadKgPactada}
-              onChange={(e) => setCantidadKgPactada(e.target.value)}
+              value={cantidad}
+              onChange={(e) => setCantidad(e.target.value)}
               required
             />
+            {cantidadKg !== null && (
+              <p className="text-xs text-muted-foreground">
+                {unidadCantidad === '@'
+                  ? `= ${cantidadKg.toFixed(2)} kg`
+                  : `= ${(cantidadKg / ARROBA_KG).toFixed(2)} @ (arroba de ${ARROBA_KG} kg)`}
+              </p>
+            )}
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="precioKg">Precio fijo por kg</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="precio">Precio fijo</Label>
+              <UnitToggle unidad={unidadPrecio} onChange={cambiarUnidadPrecio} />
+            </div>
             <Input
-              id="precioKg"
+              id="precio"
               type="number"
               step="1"
-              value={precioKg}
-              onChange={(e) => setPrecioKg(e.target.value)}
+              value={precio}
+              onChange={(e) => setPrecio(e.target.value)}
               required
             />
+            {precioKg !== null && (
+              <p className="text-xs text-muted-foreground">
+                {unidadPrecio === '@'
+                  ? `= ${precioKg.toLocaleString('es-CO', { maximumFractionDigits: 0 })}/kg`
+                  : `= ${(precioKg * ARROBA_KG).toLocaleString('es-CO', { maximumFractionDigits: 0 })}/@`}
+              </p>
+            )}
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="fechaLimite">Fecha límite (opcional)</Label>
-            <Input
-              id="fechaLimite"
-              type="date"
-              value={fechaLimite}
-              onChange={(e) => setFechaLimite(e.target.value)}
-            />
-          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="fechaLimite">Fecha límite (opcional)</Label>
+          <Input
+            id="fechaLimite"
+            type="date"
+            value={fechaLimite}
+            onChange={(e) => setFechaLimite(e.target.value)}
+            className="max-w-[200px]"
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">
