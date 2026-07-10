@@ -27,4 +27,8 @@ export class CreateTenantDto {
   @IsString()
   @MinLength(8)
   adminPassword: string;
+
+  @IsOptional()
+  @IsString()
+  planId?: string;
 }

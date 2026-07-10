@@ -82,8 +82,16 @@ enum Permission {
 }
 
 // Tipos de café que efectivamente se COMPRAN en recepción.
+// MOJADO: café recién despulpado y lavado, aún húmedo — se compra a precio
+// directo negociado (no se le mide humedad, no tiene sentido en ese estado).
+// PERGAMINO: café que el proveedor ya secó por su cuenta antes de vender —
+// aquí sí aplica el análisis de calidad (humedad + factor de rendimiento) y
+// la tabla de precios, porque el rango de humedad de referencia (10-12%) es
+// el de café seco, no el del mojado recién lavado.
+// PASILLA: precio directo negociado, sin análisis de calidad.
 enum TipoCafeRecepcion {
   MOJADO
+  PERGAMINO
   PASILLA
 }
 
@@ -174,6 +182,19 @@ model PlatformAdmin {
 // TENANCY, AUTH, USUARIOS Y PERMISOS
 // ============================================================
 
+// Plan asignado por el super-admin de plataforma a cada tenant: define
+// límites de uso (no es un sistema de facturación, solo control de acceso).
+// null en los límites = sin tope.
+model Plan {
+  id              String   @id @default(cuid())
+  nombre          String   @unique
+  maxUsuarios     Int
+  maxPuntosCompra Int?
+  createdAt       DateTime @default(now())
+
+  tenants Tenant[]
+}
+
 model Tenant {
   id          String       @id @default(cuid())
   nombre      String
@@ -181,12 +202,14 @@ model Tenant {
   razonSocial String?
   logoUrl     String?
   email       String?
+  planId      String?
   telefono    String?
   direccion   String?
   estado      EstadoTenant @default(PRUEBA)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
+  plan                    Plan?         @relation(fields: [planId], references: [id])
   puntosCompra            PuntoCompra[]
   roles                   Role[]
   users                   User[]
@@ -210,6 +233,7 @@ model Tenant {
   analisisCalidad         AnalisisCalidad[]
 
   @@index([estado])
+  @@index([planId])
 }
 
 model PuntoCompra {

@@ -8,7 +8,7 @@
 
 **FASE 2: Desarrollo del MVP — Sprint 3-4**
 
-Terminado: autenticación/usuarios, Proveedores, Recepción (con tabla de precios y catálogo de defectos), Bodega (inventario, secado, trilla, destino de pasilla), Pagos (anticipos, pagos, conciliación manual, estado de cuenta), fix de bugs estructurales que bloqueaban TODO módulo tenant-scoped.
+Terminado: autenticación/usuarios, Proveedores, Recepción (con tabla de precios, catálogo de defectos, y compra directa de pergamino seco), Bodega (inventario, secado, trilla, destino de pasilla), Pagos (anticipos, pagos, conciliación manual, estado de cuenta), Plan/límites por tenant + panel de super-admin + Configuración (puntos de compra, usuarios, roles), fix de bugs estructurales que bloqueaban TODO módulo tenant-scoped.
 Siguiente: **Ventas** — venta de café procesado (consume inventario de PERGAMINO/ALMENDRA/PASILLA) para poder calcular rentabilidad por lote; después `facturacion` (adaptador DIAN) y `reportes` (dashboard/KPIs).
 
 ## Fase 1 — Planificación y Diseño: COMPLETA
@@ -28,19 +28,48 @@ Antes de esa sesión, **ningún módulo tenant-scoped había sido probado end-to
 
 Estos 4 fixes son la base que hace posible que Proveedores y Recepción funcionen; cualquier módulo nuevo debe seguir el mismo patrón (ver ejemplos en `proveedores.service.ts` y `recepcion.service.ts`).
 
+## Corrección de dominio en Recepción (sesión 2026-07-10, corrige diseño original)
+
+El diseño original (ver Fase 1) le pedía humedad + factor de rendimiento al café **MOJADO** (recién despulpado y lavado) y usaba esos datos para matchear la tabla de precios. Es un error de dominio: el rango de humedad de referencia (10-12%) es el de café **seco**, no el de mojado recién lavado — no tiene sentido medirle humedad a algo que acaba de salir del lavado. Corregido:
+
+- **MOJADO**: ahora precio directo negociado (como pasilla), sin análisis de calidad. Su valor real se sabe después, al secarlo y trillarlo en Bodega.
+- **PERGAMINO** (nuevo tipo de recepción, `TipoCafeRecepcion.PERGAMINO`): compra directa de café que el proveedor ya secó por su cuenta. Aquí es donde ahora vive la lógica de humedad + factor de rendimiento + tabla de precios que antes (por error) tenía mojado. Entra a inventario de PERGAMINO directamente (sin pasar por proceso de secado), con `OrigenMovimientoInventario.RECEPCION` — el pergamino que sí se seca en Bodega sigue generando su movimiento con `OrigenMovimientoInventario.PROCESO_SECADO`; el stock es agregado, no distingue origen.
+- Migración `20260710154945_pergamino_recepcion_directa` (solo agrega el valor al enum, sin tocar datos existentes).
+- Decisión actualizada en `docs/requerimientos.md` (sección "Estados de bodega/conversión").
+
+## Plan/límites por tenant + panel de super-admin (sesión 2026-07-10)
+
+A pedido del usuario: cada tenant es un negocio separado (multi-tenancy ya lo garantizaba), pero faltaba la forma de **administrar cuántos usuarios/puntos de compra puede tener cada uno** y una pantalla para gestionarlo sin tocar la API a mano.
+
+- **Schema**: nuevo modelo `Plan` (`nombre`, `maxUsuarios`, `maxPuntosCompra` nullable = sin límite) + `Tenant.planId` nullable. Migración `20260710155418_plan_tenant_limits`. No es un sistema de facturación/cobro, solo control de acceso — no hay precio ni ciclo de facturación en el modelo.
+- **Backend** (`src/modules/platform`): `GET/POST /platform/planes`, `PATCH /platform/planes/:id`; `PATCH /platform/tenants/:id` para asignar plan y cambiar `estado` (ACTIVO/SUSPENDIDO/PRUEBA); `POST /platform/tenants` acepta `planId` opcional. `GET /platform/tenants` incluye el plan y los conteos de usuarios/puntos de compra.
+- **Enforcement de límites**: `UsersService.create()` y `PuntosCompraService.create()` rechazan con 400 si el tenant tiene plan asignado y ya alcanzó `maxUsuarios`/`maxPuntosCompra`. Un tenant sin plan asignado no tiene límite.
+- **Suspensión real**: `AuthService.login()` y `.refresh()` ahora rechazan con 401 si `tenant.estado === SUSPENDIDO` — antes de este cambio, suspender un tenant desde plataforma no tenía ningún efecto real. Igual que con `user.activo`, esto solo se verifica en login/refresh (no en cada request, el access token de 15 min sigue siendo válido hasta expirar — mismo modelo de seguridad que ya existía para usuarios inactivos).
+- **Frontend — panel de plataforma** (`app/platform/*`, fuera del grupo `(dashboard)`): auth completamente separada de la del tenant (`lib/platform-auth.tsx` + `lib/platform-api.ts`, storage keys propios `coffee-manager:platform:*`, login en `/platform/login`). `/platform` lista tenants con plan/estado/conteos y permite cambiar plan (select inline) y suspender/activar (botón inline); `/platform/tenants/nuevo` crea tenant + admin + plan opcional; `/platform/planes` lista y crea planes.
+- **Frontend — Configuración del tenant** (`app/(dashboard)/configuracion/*`, ya no es placeholder): página principal muestra el plan actual y uso (usuarios/puntos de compra vs. límite, vía `GET /tenants/me` ampliado con `plan` + `_count`); `/configuracion/puntos-compra` crea y activa/desactiva puntos de compra; `/configuracion/usuarios` crea usuarios (con selección de roles y punto de compra) y activa/desactiva; `/configuracion/roles` crea roles y edita sus permisos con un grid agrupado por módulo (el rol "Administrador" es fijo, no editable — ya validado en el backend).
+- `packages/shared-types` ampliado con `EstadoTenant`, `Plan`, `PlatformTenant`, `Role`, `RolePermissionEntry`, `User`, `UserRoleAssignment`, `TenantSelf`.
+
+Verificado end-to-end con curl: creación de plan, asignación a tenant, bloqueo del 2do punto de compra al alcanzar el límite, permiso del 2do usuario y bloqueo del 3ro, suspensión de tenant seguida de login rechazado (401) y reactivación seguida de login exitoso.
+
+### Pendiente / fuera de alcance de esta pasada
+- No hay facturación/cobro real de planes (es solo control de acceso, como se acordó con el usuario).
+- El panel de plataforma no tiene edición de tenant más allá de plan/estado (nombre, NIT, etc. no editables desde ahí todavía).
+- `/configuracion/puntos-compra` no permite editar dirección/teléfono después de creado, solo activar/desactivar (alcance reducido a propósito, ver nota de la sesión).
+- El límite de plan solo se aplica a usuarios y puntos de compra — no hay límite de recepciones/almacenamiento ni nada de eso (no se pidió).
+
 ## Backend (`apps/api` — NestJS + Prisma)
 
 ### Implementado
 - Multi-tenancy: extensión de Prisma con scoping automático por `tenantId` (`src/prisma/extensions/tenant-scoping.extension.ts`).
 - **Auth**: login + refresh token JWT (`src/modules/auth`).
 - **Users + Roles**: CRUD de usuarios, roles con permisos granulares M2M (`src/modules/users`).
-- **Platform**: panel de super-admin, creación manual de tenants (`src/modules/platform`).
-- **Tenants**: configuración de empresa (NIT, resolución DIAN) y puntos de compra (`src/modules/tenants`).
+- **Platform**: super-admin de plataforma — login propio, CRUD de tenants (con plan y estado) y CRUD de planes (`src/modules/platform`).
+- **Tenants**: configuración de empresa (NIT, resolución DIAN), `GET /tenants/me` con plan+conteos, y puntos de compra con límite por plan (`src/modules/tenants`).
 - **Proveedores**: CRUD completo (`src/modules/proveedores`) — crear/listar/buscar/filtrar/editar/desactivar/reactivar, validación de duplicados.
 - **Calidad**: `GET /calidad/defectos-tipo` — catálogo global de defectos (Cenicafé/FNC), usado por Recepción.
-- **Recepción** (`src/modules/recepcion`) — módulo completo:
-  - `POST /tabla-precios`, `GET /tabla-precios?fecha=` — tramos de precio por factor de rendimiento + humedad (precio absoluto por kg, vigente por fecha, opcionalmente por punto de compra).
-  - `POST /recepcion` — crea una recepción MOJADO (con `AnalisisCalidad` + defectos anidados en la misma transacción, factor de rendimiento calculado o manual, matcheo automático del tramo de precio vigente según humedad+factor) o PASILLA (precio directo negociado, sin análisis de calidad). Genera código correlativo `REC-{año}-{secuencial}` por tenant.
+- **Recepción** (`src/modules/recepcion`) — módulo completo (ver corrección de dominio más abajo, sesión 2026-07-10):
+  - `POST /tabla-precios`, `GET /tabla-precios?fecha=` — tramos de precio por factor de rendimiento + humedad (precio absoluto por kg, vigente por fecha, opcionalmente por punto de compra). Solo aplica a recepciones de PERGAMINO.
+  - `POST /recepcion` — crea una recepción PERGAMINO (con `AnalisisCalidad` + defectos anidados en la misma transacción, factor de rendimiento calculado o manual, matcheo automático del tramo de precio vigente según humedad+factor) o MOJADO/PASILLA (precio directo negociado, sin análisis de calidad). Genera código correlativo `REC-{año}-{secuencial}` por tenant.
   - `GET /recepcion` (filtros: proveedor, punto de compra, tipo, rango de fechas), `GET /recepcion/:id` (detalle completo).
   - **Alcance deliberadamente limitado en esta pasada**: no hay `PATCH`/`DELETE` de recepciones (son registros financieros — editarlas requiere recalcular inventario/pagos/facturas asociados, se deja para cuando existan esos módulos). Tampoco hay generación de PDF del recibo todavía.
 - **Bodega** (`src/modules/bodega`) — módulo completo:
@@ -59,7 +88,7 @@ Estos 4 fixes son la base que hace posible que Proveedores y Recepción funcione
 - **Audit log**: registro de cambios en módulos sensibles (`src/common/audit`).
 - Guards: `JwtAuthGuard`, `PermissionsGuard`, `PlatformAuthGuard` — registrados globalmente.
 
-Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, recepción mojado con factor calculado y defectos, recepción pasilla, error claro cuando no hay tramo vigente, aislamiento entre tenants, caso de permisos denegados (403), la cadena completa mojado→secado→pergamino→trilla→almendra + pasilla→mezcla→pergamino con sus validaciones (recepción duplicada en secado, stock insuficiente para trilla, destino ya decidido), y el ciclo anticipo→pago→conciliación→estado de cuenta con sus validaciones (anticipo con CREDITO rechazado, cheque sin número rechazado, conciliación que excede el saldo disponible rechazada, conciliación sin recepción ni pago rechazada).
+Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, recepción de pergamino con factor calculado/manual y defectos, recepción de mojado y pasilla a precio directo (sin análisis de calidad, rechazadas si falta `precioKg`), error claro cuando no hay tramo vigente para pergamino, aislamiento entre tenants, caso de permisos denegados (403), la cadena completa mojado→secado→pergamino→trilla→almendra + pasilla→mezcla→pergamino con sus validaciones (recepción duplicada en secado, stock insuficiente para trilla, destino ya decidido), y el ciclo anticipo→pago→conciliación→estado de cuenta con sus validaciones (anticipo con CREDITO rechazado, cheque sin número rechazado, conciliación que excede el saldo disponible rechazada, conciliación sin recepción ni pago rechazada).
 
 ### Pendiente (scaffold vacío — controller/service/module creados pero SIN lógica de negocio)
 - `ventas` — venta de café procesado (consume el inventario de PERGAMINO/ALMENDRA/PASILLA que ya genera Bodega) ⬅ **candidato a seguir**
@@ -74,7 +103,7 @@ Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, r
 - **Módulo Proveedores completo**: listado con búsqueda/filtro, alta, edición, validado con Zod compartido (`packages/validation-schemas`).
 - **Módulo Recepción completo**:
   - `app/(dashboard)/recepcion/page.tsx` — listado con montos formateados en COP.
-  - `app/(dashboard)/recepcion/nueva/page.tsx` — formulario con toggle Mojado/Pasilla, selects de proveedor/punto de compra (poblados desde la API), campos condicionales de calidad (humedad, factor calculado con preview en vivo o manual, defectos con selector del catálogo), campo de precio directo para pasilla.
+  - `app/(dashboard)/recepcion/nueva/page.tsx` — formulario con toggle Mojado/Pergamino seco/Pasilla, selects de proveedor/punto de compra (poblados desde la API), campos condicionales de calidad (humedad, factor calculado con preview en vivo o manual, defectos con selector del catálogo) solo para Pergamino, campo de precio directo para Mojado/Pasilla.
   - `app/(dashboard)/recepcion/[id]/page.tsx` — detalle de solo lectura.
   - `app/(dashboard)/recepcion/precios/page.tsx` — alta y listado de tramos de precio del día.
   - **Nota de diseño**: este formulario usa estado local (`useState`) en vez de react-hook-form+Zod compartido como Proveedores, porque los campos condicionales (mojado vs. pasilla, factor calculado vs. manual, lista dinámica de defectos) son más simples de manejar así dado el tiempo disponible. La validación fina vive en el backend; el frontend hace solo validación básica de campos requeridos y muestra los errores del servidor.
@@ -88,10 +117,11 @@ Todo lo anterior verificado end-to-end con curl: creación de tramo de precio, r
   - `app/(dashboard)/pagos/anticipos/page.tsx` + `.../nuevo` — listado y alta de anticipos (selector de método de pago limitado a efectivo/transferencia/cheque, sin CREDITO).
   - `app/(dashboard)/pagos/anticipos/[id]/page.tsx` — detalle del anticipo (monto/conciliado/saldo disponible) con formulario de conciliación inline (contra recepción o contra pago del mismo proveedor, con `max` del input acotado al saldo disponible); se oculta el formulario cuando el saldo llega a cero.
   - `app/(dashboard)/pagos/cuenta/page.tsx` — selector de proveedor + tarjetas KPI con el estado de cuenta (`GET /pagos/cuenta/:id`), con nota explícita de que el saldo es estimado/informativo, no autoritativo.
-- `packages/shared-types` ampliado con `PuntoCompra`, `DefectoTipo`, `TablaPrecioTramo`, `AnalisisCalidad`, `DefectoAnalisis`, `Recepcion`, `CategoriaDefecto`, `EstadoProcesoSecado`, `InventarioItem`, `ProcesoSecado`, `TrillaProceso`, `Anticipo`, `AnticipoDetalle`, `Pago`, `ConciliacionAnticipo`, `EstadoCuentaProveedor`.
+- **Panel de super-admin** (`app/platform/*`) y **Configuración del tenant** (`app/(dashboard)/configuracion/*`) — ver detalle completo en la sección "Plan/límites por tenant + panel de super-admin" más arriba.
+- `packages/shared-types` ampliado con `PuntoCompra`, `DefectoTipo`, `TablaPrecioTramo`, `AnalisisCalidad`, `DefectoAnalisis`, `Recepcion`, `CategoriaDefecto`, `EstadoProcesoSecado`, `InventarioItem`, `ProcesoSecado`, `TrillaProceso`, `Anticipo`, `AnticipoDetalle`, `Pago`, `ConciliacionAnticipo`, `EstadoCuentaProveedor`, `EstadoTenant`, `Plan`, `PlatformTenant`, `Role`, `RolePermissionEntry`, `User`, `UserRoleAssignment`, `TenantSelf`.
 
 ### Pendiente
-- Páginas de dashboard aún placeholder: facturación, reportes, configuración.
+- Páginas de dashboard aún placeholder: facturación, reportes.
 - `register` sigue como placeholder — **correcto así** (onboarding manual por diseño).
 - No hay refresh automático de token (access token dura 15 min; toca volver a loguear si expira a mitad de una sesión larga).
 - No se probó visualmente en un navegador real en ninguna sesión (no hay herramienta de automatización de navegador disponible) — se verificó con `next build`/`next lint` limpios, todas las rutas devolviendo 200, y las formas de datos del frontend confirmadas contra las respuestas reales de la API vía curl.
@@ -108,7 +138,7 @@ pnpm --filter api build && node apps/api/dist/src/main   # o: pnpm --filter api 
 pnpm --filter web dev   # http://localhost:3000
 ```
 
-Para crear el primer tenant de prueba: `POST /platform/auth/login` (con `PLATFORM_ADMIN_EMAIL`/`PASSWORD` del seed) y luego `POST /platform/tenants`. Para poder crear una recepción MOJADO hace falta antes crear al menos un punto de compra (`POST /puntos-compra`) y un tramo de precio vigente para la fecha (`POST /tabla-precios`), o usar la página `/recepcion/precios`.
+Para crear el primer tenant de prueba: entrar a `/platform/login` con `PLATFORM_ADMIN_EMAIL`/`PASSWORD` del seed (o `POST /platform/auth/login` por curl) y crear el tenant desde `/platform/tenants/nuevo` (o `POST /platform/tenants`). Puntos de compra, usuarios y roles ya se pueden crear desde `/configuracion` dentro del dashboard del tenant, no hace falta curl. Para poder crear una recepción de PERGAMINO hace falta un tramo de precio vigente para la fecha (`POST /tabla-precios` o la página `/recepcion/precios`) — mojado y pasilla no lo necesitan (precio directo).
 
 ## Cómo retomar en la próxima sesión
 

@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -7,6 +12,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { PlatformJwtPayload } from '../../common/types/auth.types';
 import { PlatformLoginDto } from './dto/platform-login.dto';
 import { CreateTenantDto } from './dto/create-tenant.dto';
+import { CreatePlanDto } from './dto/create-plan.dto';
+import { UpdatePlanDto } from './dto/update-plan.dto';
+import { UpdateTenantPlatformDto } from './dto/update-tenant-platform.dto';
 
 const ADMIN_ROLE_NAME = 'Administrador';
 
@@ -60,10 +68,42 @@ export class PlatformService {
         nit: true,
         estado: true,
         createdAt: true,
+        plan: true,
         _count: { select: { users: true, puntosCompra: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async updateTenant(id: string, dto: UpdateTenantPlatformDto) {
+    if (dto.planId) {
+      const plan = await this.prisma.plan.findUnique({
+        where: { id: dto.planId },
+      });
+      if (!plan) throw new BadRequestException('El plan indicado no existe');
+    }
+    const tenant = await this.prisma.tenant.findUnique({ where: { id } });
+    if (!tenant) throw new NotFoundException('Tenant no encontrado');
+
+    return this.prisma.tenant.update({
+      where: { id },
+      data: { planId: dto.planId, estado: dto.estado },
+      include: { plan: true },
+    });
+  }
+
+  listPlanes() {
+    return this.prisma.plan.findMany({ orderBy: { createdAt: 'asc' } });
+  }
+
+  createPlan(dto: CreatePlanDto) {
+    return this.prisma.plan.create({ data: dto });
+  }
+
+  async updatePlan(id: string, dto: UpdatePlanDto) {
+    const plan = await this.prisma.plan.findUnique({ where: { id } });
+    if (!plan) throw new NotFoundException('Plan no encontrado');
+    return this.prisma.plan.update({ where: { id }, data: dto });
   }
 
   // Transaccional: crea el Tenant + su rol "Administrador" (con TODOS los
@@ -71,11 +111,18 @@ export class PlatformService {
   // PrismaService base (sin tenant-scoping) porque literalmente está creando
   // el tenant.
   async createTenant(dto: CreateTenantDto) {
+    if (dto.planId) {
+      const plan = await this.prisma.plan.findUnique({
+        where: { id: dto.planId },
+      });
+      if (!plan) throw new BadRequestException('El plan indicado no existe');
+    }
+
     const passwordHash = await bcrypt.hash(dto.adminPassword, 10);
 
     const { tenant, admin } = await this.prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.create({
-        data: { nombre: dto.nombreTenant, nit: dto.nit },
+        data: { nombre: dto.nombreTenant, nit: dto.nit, planId: dto.planId },
       });
 
       const role = await tx.role.create({

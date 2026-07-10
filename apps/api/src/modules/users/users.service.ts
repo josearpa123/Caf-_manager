@@ -71,7 +71,20 @@ export class UsersService {
     }
   }
 
+  private async assertLimitePlanNoSuperado() {
+    const tenant = await this.prisma.tenant.findFirst({
+      include: { plan: true, _count: { select: { users: true } } },
+    });
+    const maxUsuarios = tenant?.plan?.maxUsuarios;
+    if (maxUsuarios != null && tenant!._count.users >= maxUsuarios) {
+      throw new BadRequestException(
+        `Se alcanzó el límite de usuarios del plan actual (${maxUsuarios}). Contacte al administrador para ampliarlo.`,
+      );
+    }
+  }
+
   async create(tenantId: string, dto: CreateUserDto) {
+    await this.assertLimitePlanNoSuperado();
     await this.assertRolesBelongToTenant(dto.roleIds);
     if (dto.puntoCompraId) {
       await this.assertPuntoCompraBelongsToTenant(dto.puntoCompraId);

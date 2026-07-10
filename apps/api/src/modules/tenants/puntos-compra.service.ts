@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { CreatePuntoCompraDto } from './dto/create-punto-compra.dto';
@@ -20,7 +24,20 @@ export class PuntosCompraService {
     return punto;
   }
 
-  create(tenantId: string, dto: CreatePuntoCompraDto) {
+  private async assertLimitePlanNoSuperado() {
+    const tenant = await this.prisma.tenant.findFirst({
+      include: { plan: true, _count: { select: { puntosCompra: true } } },
+    });
+    const maxPuntosCompra = tenant?.plan?.maxPuntosCompra;
+    if (maxPuntosCompra != null && tenant!._count.puntosCompra >= maxPuntosCompra) {
+      throw new BadRequestException(
+        `Se alcanzó el límite de puntos de compra del plan actual (${maxPuntosCompra}). Contacte al administrador para ampliarlo.`,
+      );
+    }
+  }
+
+  async create(tenantId: string, dto: CreatePuntoCompraDto) {
+    await this.assertLimitePlanNoSuperado();
     return this.prisma.puntoCompra.create({ data: { tenantId, ...dto } });
   }
 

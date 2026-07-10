@@ -29,16 +29,19 @@ export class CreateRecepcionDto {
   @Min(0)
   pesoTara: number;
 
+  // Solo PERGAMINO lleva análisis de calidad (humedad + factor de
+  // rendimiento): es café que el proveedor ya secó por su cuenta. El mojado
+  // recién lavado no se mide así, y la pasilla tampoco.
   @ValidateIf(
-    (dto: CreateRecepcionDto) => dto.tipoCafe === TipoCafeRecepcion.MOJADO,
+    (dto: CreateRecepcionDto) => dto.tipoCafe === TipoCafeRecepcion.PERGAMINO,
   )
   @ValidateNested()
   @Type(() => CreateAnalisisCalidadDto)
   analisisCalidad?: CreateAnalisisCalidadDto;
 
-  // Precio directo negociado, solo para PASILLA (no pasa por la tabla de precios).
+  // Precio directo negociado para MOJADO y PASILLA (no pasan por la tabla de precios).
   @ValidateIf(
-    (dto: CreateRecepcionDto) => dto.tipoCafe === TipoCafeRecepcion.PASILLA,
+    (dto: CreateRecepcionDto) => dto.tipoCafe !== TipoCafeRecepcion.PERGAMINO,
   )
   @IsNumber()
   @IsPositive()

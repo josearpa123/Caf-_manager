@@ -16,14 +16,13 @@
 - **Facturación electrónica**: se emite una factura por cada recepción/lote (1:1), no consolidada.
 - **Métodos de pago**: efectivo, transferencia bancaria, cheque, crédito/cuenta por pagar.
 - **Onboarding de tenants**: aprovisionamiento manual por el admin de la plataforma (sin self-service registration) para la fase de beta.
-- **Estados de bodega/conversión** (confirmado con el usuario):
-  - **Mojado**: café pergamino recién despulpado, aún no seco. Es lo que se le compra al caficultor en la línea principal.
-  - **Pergamino (seco)**: resultado de secar el mojado en máquinas. El sistema debe:
-    - Registrar peso comprado en mojado y peso resultante en seco por cada proceso de secado.
-    - Calcular el % de rendimiento de secado (kg seco / kg mojado) de cada lote.
-    - Mantener un promedio histórico de rendimiento de secado para proyectar cuánto café seco debería salir dado un peso de mojado comprado, y detectar desviaciones frente al promedio.
-  - **Almendra**: resultado de trillar el pergamino seco (factor de rendimiento de trilla, ya cubierto en el módulo de calidad).
-  - **Pasilla**: se compra **ya seca** directamente al proveedor (compra independiente, no se compra mojada, tiene su propio registro/precio en recepción). Después de comprada, tiene dos destinos posibles que el operador elige por lote: (a) se mezcla con el inventario de café pergamino, o (b) se vende por separado como pasilla. El modelo de bodega debe soportar ambos destinos por lote de pasilla.
+- **Estados de bodega/conversión** (revisado 2026-07-10, corrige la decisión original de la sesión de diseño):
+  - **Mojado**: café recién despulpado y lavado, aún húmedo. Se compra a **precio directo negociado** (como pasilla) — no se le mide humedad ni factor de rendimiento en este punto, no tiene sentido hacerlo sobre café que acaba de salir del lavado. Su valor real se conoce después, al secarlo y trillarlo en Bodega.
+  - **Pergamino (seco)**: café ya seco. Tiene **dos orígenes posibles**:
+    (a) resultado de secar mojado en Bodega (proceso de secado, sin cambios: registra peso mojado/peso seco por lote, calcula % de rendimiento de secado, mantiene promedio histórico para proyectar);
+    (b) **compra directa en Recepción** — un proveedor que ya secó su propio café por su cuenta lo vende como pergamino. Esta compra sí lleva análisis de calidad (humedad + factor de rendimiento) y pasa por la tabla de precios configurable, porque el rango de humedad de referencia (10-12%) es el de café seco — es la lógica que originalmente (por error) se le había puesto a la recepción de mojado.
+  - **Almendra**: resultado de trillar el pergamino seco, sin importar su origen (secado o compra directa) — el stock de pergamino es agregado (factor de rendimiento de trilla, ya cubierto en el módulo de calidad).
+  - **Pasilla**: se compra **ya seca** directamente al proveedor, a precio directo negociado (compra independiente, no se compra mojada, sin análisis de calidad). Después de comprada, tiene dos destinos posibles que el operador elige por lote: (a) se mezcla con el inventario de café pergamino, o (b) se vende por separado como pasilla. El modelo de bodega debe soportar ambos destinos por lote de pasilla.
 - **Defectos de calidad**: catálogo tipificado de defectos (norma Cenicafé/FNC: negro, vinagre, brocado, vano, partido, etc.) con cantidad/porcentaje por tipo.
 - **KPIs prioritarios del dashboard**: compras por período, saldo pendiente a proveedores, inventario actual en bodega, calidad promedio comprada.
 - **Notificaciones**: solo dentro de la app en el MVP (sin email/WhatsApp por ahora).

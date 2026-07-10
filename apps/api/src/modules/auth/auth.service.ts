@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'crypto';
+import { EstadoTenant } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantJwtPayload } from '../../common/types/auth.types';
 import { LoginDto } from './dto/login.dto';
@@ -27,6 +28,7 @@ export class AuthService {
       where: { id: userId },
       include: {
         roles: { include: { role: { include: { permisos: true } } } },
+        tenant: { select: { estado: true } },
       },
     });
   }
@@ -67,6 +69,7 @@ export class AuthService {
       where: { email: dto.email },
       include: {
         roles: { include: { role: { include: { permisos: true } } } },
+        tenant: { select: { estado: true } },
       },
     });
 
@@ -77,6 +80,12 @@ export class AuthService {
     const passwordOk = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordOk) {
       throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    if (user.tenant.estado === EstadoTenant.SUSPENDIDO) {
+      throw new UnauthorizedException(
+        'Esta cuenta está suspendida. Contacte al administrador.',
+      );
     }
 
     const { permissions, roleNames } = this.computePermissions(user);
@@ -126,6 +135,11 @@ export class AuthService {
     const user = await this.loadUserWithPermissions(existing.userId);
     if (!user.activo) {
       throw new UnauthorizedException('Usuario inactivo');
+    }
+    if (user.tenant.estado === EstadoTenant.SUSPENDIDO) {
+      throw new UnauthorizedException(
+        'Esta cuenta está suspendida. Contacte al administrador.',
+      );
     }
 
     await this.prisma.refreshToken.update({

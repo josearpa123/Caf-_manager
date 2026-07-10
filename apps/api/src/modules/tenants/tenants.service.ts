@@ -10,7 +10,13 @@ export class TenantsService {
   ) {}
 
   getMine(tenantId: string) {
-    return this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    return this.prisma.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      include: {
+        plan: true,
+        _count: { select: { users: true, puntosCompra: true } },
+      },
+    });
   }
 
   update(tenantId: string, dto: UpdateTenantDto) {

@@ -2,6 +2,13 @@
 // manualmente con los enums equivalentes en apps/api/prisma/schema.prisma —
 // el frontend no puede importar el Prisma Client generado directamente.
 
+export const EstadoTenant = {
+  ACTIVO: 'ACTIVO',
+  SUSPENDIDO: 'SUSPENDIDO',
+  PRUEBA: 'PRUEBA',
+} as const;
+export type EstadoTenant = (typeof EstadoTenant)[keyof typeof EstadoTenant];
+
 export const TipoIdentificacion = {
   CC: 'CC',
   NIT: 'NIT',
@@ -14,6 +21,7 @@ export type TipoIdentificacion =
 
 export const TipoCafeRecepcion = {
   MOJADO: 'MOJADO',
+  PERGAMINO: 'PERGAMINO',
   PASILLA: 'PASILLA',
 } as const;
 export type TipoCafeRecepcion =
@@ -335,6 +343,79 @@ export interface EstadoCuentaProveedor {
   totalConciliado: number;
   anticiposSinConciliar: number;
   saldoPendienteEstimado: number;
+}
+
+export interface RolePermissionEntry {
+  id: string;
+  tenantId: string;
+  roleId: string;
+  permission: Permission;
+}
+
+export interface Role {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  descripcion: string | null;
+  esSistema: boolean;
+  createdAt: string;
+  updatedAt: string;
+  permisos: RolePermissionEntry[];
+}
+
+export interface UserRoleAssignment {
+  id: string;
+  userId: string;
+  roleId: string;
+  role: Role;
+}
+
+export interface User {
+  id: string;
+  tenantId: string;
+  email: string;
+  nombre: string;
+  telefono: string | null;
+  puntoCompraId: string | null;
+  activo: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  roles: UserRoleAssignment[];
+}
+
+export interface TenantSelf {
+  id: string;
+  nombre: string;
+  nit: string | null;
+  razonSocial: string | null;
+  logoUrl: string | null;
+  email: string | null;
+  telefono: string | null;
+  direccion: string | null;
+  estado: EstadoTenant;
+  createdAt: string;
+  updatedAt: string;
+  plan: Plan | null;
+  _count: { users: number; puntosCompra: number };
+}
+
+export interface Plan {
+  id: string;
+  nombre: string;
+  maxUsuarios: number;
+  maxPuntosCompra: number | null;
+  createdAt: string;
+}
+
+export interface PlatformTenant {
+  id: string;
+  nombre: string;
+  nit: string | null;
+  estado: EstadoTenant;
+  createdAt: string;
+  plan: Plan | null;
+  _count: { users: number; puntosCompra: number };
 }
 
 export interface TrillaProceso {

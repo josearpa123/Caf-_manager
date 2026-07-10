@@ -22,7 +22,9 @@ export default function NuevaRecepcionPage() {
   const [puntosCompra, setPuntosCompra] = useState<PuntoCompra[]>([]);
   const [defectosTipo, setDefectosTipo] = useState<DefectoTipo[]>([]);
 
-  const [tipoCafe, setTipoCafe] = useState<'MOJADO' | 'PASILLA'>(TipoCafeRecepcion.MOJADO);
+  const [tipoCafe, setTipoCafe] = useState<'MOJADO' | 'PERGAMINO' | 'PASILLA'>(
+    TipoCafeRecepcion.MOJADO,
+  );
   const [proveedorId, setProveedorId] = useState('');
   const [puntoCompraId, setPuntoCompraId] = useState('');
   const [pesoBruto, setPesoBruto] = useState('');
@@ -87,7 +89,7 @@ export default function NuevaRecepcionPage() {
       pesoTara: Number(pesoTara),
     };
 
-    if (tipoCafe === TipoCafeRecepcion.MOJADO) {
+    if (tipoCafe === TipoCafeRecepcion.PERGAMINO) {
       if (!humedad) {
         setError('Ingresa la humedad');
         return;
@@ -120,7 +122,7 @@ export default function NuevaRecepcionPage() {
       payload.analisisCalidad = analisisCalidad;
     } else {
       if (!precioKg) {
-        setError('Ingresa el precio por kg de la pasilla');
+        setError('Ingresa el precio por kg negociado');
         return;
       }
       payload.precioKg = Number(precioKg);
@@ -143,20 +145,22 @@ export default function NuevaRecepcionPage() {
 
       <form onSubmit={onSubmit} className="mt-6 flex max-w-2xl flex-col gap-6">
         <div className="flex gap-2">
-          {(Object.values(TipoCafeRecepcion) as Array<'MOJADO' | 'PASILLA'>).map((tipo) => (
-            <button
-              key={tipo}
-              type="button"
-              onClick={() => setTipoCafe(tipo)}
-              className={`rounded-md border px-4 py-2 text-sm font-medium ${
-                tipoCafe === tipo
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-input bg-background'
-              }`}
-            >
-              {tipo === 'MOJADO' ? 'Mojado' : 'Pasilla'}
-            </button>
-          ))}
+          {(Object.values(TipoCafeRecepcion) as Array<'MOJADO' | 'PERGAMINO' | 'PASILLA'>).map(
+            (tipo) => (
+              <button
+                key={tipo}
+                type="button"
+                onClick={() => setTipoCafe(tipo)}
+                className={`rounded-md border px-4 py-2 text-sm font-medium ${
+                  tipoCafe === tipo
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-input bg-background'
+                }`}
+              >
+                {tipo === 'MOJADO' ? 'Mojado' : tipo === 'PERGAMINO' ? 'Pergamino seco' : 'Pasilla'}
+              </button>
+            ),
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -225,7 +229,7 @@ export default function NuevaRecepcionPage() {
           </div>
         </div>
 
-        {tipoCafe === 'MOJADO' && (
+        {tipoCafe === 'PERGAMINO' && (
           <div className="flex flex-col gap-4 rounded-md border p-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="humedad">Humedad (%)</Label>
@@ -362,7 +366,7 @@ export default function NuevaRecepcionPage() {
           </div>
         )}
 
-        {tipoCafe === 'PASILLA' && (
+        {tipoCafe !== 'PERGAMINO' && (
           <div className="flex flex-col gap-1.5 rounded-md border p-4">
             <Label htmlFor="precioKg">Precio por kg (negociado directamente)</Label>
             <Input

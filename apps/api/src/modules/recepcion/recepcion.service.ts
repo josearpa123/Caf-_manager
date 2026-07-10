@@ -38,6 +38,14 @@ const RECEPCION_LIST_INCLUDE = {
   puntoCompra: { select: { nombre: true } },
 } as const;
 
+// Los tres tipos de café que se compran en recepción existen 1:1 como tipo
+// de inventario (ver TipoInventario en el schema).
+const INVENTARIO_POR_TIPO: Record<TipoCafeRecepcion, TipoInventario> = {
+  [TipoCafeRecepcion.MOJADO]: TipoInventario.MOJADO,
+  [TipoCafeRecepcion.PERGAMINO]: TipoInventario.PERGAMINO,
+  [TipoCafeRecepcion.PASILLA]: TipoInventario.PASILLA,
+};
+
 @Injectable()
 export class RecepcionService {
   constructor(
@@ -139,7 +147,7 @@ export class RecepcionService {
     let tablaPrecioTramoId: string | null = null;
     let factorRendimiento: number | null = null;
 
-    if (dto.tipoCafe === TipoCafeRecepcion.MOJADO) {
+    if (dto.tipoCafe === TipoCafeRecepcion.PERGAMINO) {
       const analisis = dto.analisisCalidad!;
       factorRendimiento = this.resolverFactorRendimiento(analisis);
 
@@ -157,9 +165,13 @@ export class RecepcionService {
       precioKg = Number(tramo.precioKg);
       tablaPrecioTramoId = tramo.id;
     } else {
+      // MOJADO y PASILLA: precio directo negociado, sin análisis de calidad.
+      // El mojado recién lavado no se mide con el rango de humedad de la
+      // tabla de precios (ese rango es de café seco); su valor real se sabe
+      // después, al secarlo y trillarlo en Bodega.
       if (!dto.precioKg) {
         throw new BadRequestException(
-          'Se requiere precioKg para recepciones de pasilla',
+          'Se requiere precioKg para recepciones de mojado o pasilla',
         );
       }
       precioKg = dto.precioKg;
@@ -198,10 +210,7 @@ export class RecepcionService {
           data: {
             tenantId,
             puntoCompraId: dto.puntoCompraId,
-            tipoCafe:
-              dto.tipoCafe === TipoCafeRecepcion.MOJADO
-                ? TipoInventario.MOJADO
-                : TipoInventario.PASILLA,
+            tipoCafe: INVENTARIO_POR_TIPO[dto.tipoCafe],
             tipoMovimiento: TipoMovimientoInventario.ENTRADA,
             cantidadKg: pesoNeto,
             fecha,
@@ -211,7 +220,7 @@ export class RecepcionService {
           },
         });
 
-        if (dto.tipoCafe === TipoCafeRecepcion.MOJADO) {
+        if (dto.tipoCafe === TipoCafeRecepcion.PERGAMINO) {
           const analisis = dto.analisisCalidad!;
           const analisisCalidad = await tx.analisisCalidad.create({
             data: {
