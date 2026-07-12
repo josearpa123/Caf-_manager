@@ -112,6 +112,10 @@ export const Permission = {
   ANTICIPOS_CREAR: 'ANTICIPOS_CREAR',
   ANTICIPOS_EDITAR: 'ANTICIPOS_EDITAR',
 
+  PRESTAMOS_VER: 'PRESTAMOS_VER',
+  PRESTAMOS_CREAR: 'PRESTAMOS_CREAR',
+  PRESTAMOS_EDITAR: 'PRESTAMOS_EDITAR',
+
   FACTURACION_VER: 'FACTURACION_VER',
   FACTURACION_EMITIR: 'FACTURACION_EMITIR',
   FACTURACION_ANULAR: 'FACTURACION_ANULAR',
@@ -324,6 +328,49 @@ export interface AnticipoDetalle extends Anticipo {
   saldoDisponible: number;
 }
 
+export const EstadoPrestamo = {
+  VIGENTE: 'VIGENTE',
+  PAGADO: 'PAGADO',
+  CANCELADO: 'CANCELADO',
+} as const;
+export type EstadoPrestamo = (typeof EstadoPrestamo)[keyof typeof EstadoPrestamo];
+
+export interface AbonoPrestamo {
+  id: string;
+  tenantId: string;
+  prestamoId: string;
+  monto: string;
+  fecha: string;
+  metodoPago: MetodoPago;
+  referencia: string | null;
+  notas: string | null;
+  createdById: string;
+  createdAt: string;
+}
+
+export interface Prestamo {
+  id: string;
+  tenantId: string;
+  proveedorId: string;
+  puntoCompraId: string;
+  codigo: string;
+  monto: string;
+  fecha: string;
+  estado: EstadoPrestamo;
+  notas: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  proveedor: Pick<Proveedor, 'nombre'>;
+  puntoCompra: Pick<PuntoCompra, 'nombre'>;
+  totalAbonado: number;
+  saldoPendiente: number;
+}
+
+export interface PrestamoDetalle extends Prestamo {
+  abonos: AbonoPrestamo[];
+}
+
 export interface Pago {
   id: string;
   tenantId: string;
@@ -353,6 +400,10 @@ export interface EstadoCuentaProveedor {
   totalConciliado: number;
   anticiposSinConciliar: number;
   saldoPendienteEstimado: number;
+  totalPrestado: number;
+  totalAbonadoPrestamos: number;
+  saldoPrestamosPendiente: number;
+  saldoNeto: number;
 }
 
 export interface RolePermissionEntry {
@@ -571,6 +622,93 @@ export interface ReportesDashboard {
   };
   inventario: InventarioItem[];
   saldoProveedores: { totalEstimado: number; proveedores: ReportesSaldoProveedor[] };
+}
+
+// ============================================================
+// CORTES DE ENTREGA / VIAJES
+// ============================================================
+
+export const EstadoViaje = {
+  ABIERTO: 'ABIERTO',
+  CERRADO: 'CERRADO',
+} as const;
+export type EstadoViaje = (typeof EstadoViaje)[keyof typeof EstadoViaje];
+
+// Cómo se agrupan los cortes en la serie temporal del reporte.
+export type AgrupacionCorte = 'semana' | 'mes' | 'trimestre';
+
+// Una venta resumida dentro de un corte/viaje (montos ya numéricos).
+export interface ViajeVentaResumen {
+  id: string;
+  codigo: string;
+  fecha: string;
+  tipoCafe: TipoInventario;
+  compradorNombre: string;
+  puntoCompraNombre: string;
+  cantidadKg: number;
+  valorTotal: number;
+}
+
+// Corte/viaje en el listado (con totales agregados de sus ventas).
+export interface Viaje {
+  id: string;
+  codigo: string;
+  fecha: string;
+  destino: string | null;
+  placa: string | null;
+  estado: EstadoViaje;
+  observaciones: string | null;
+  ventas: number; // cantidad de ventas
+  totalKg: number;
+  totalValor: number;
+  precioPromedioKg: number;
+}
+
+// Detalle de un corte/viaje con la lista de sus ventas.
+export interface ViajeDetalle extends Omit<Viaje, 'ventas'> {
+  ventas: ViajeVentaResumen[];
+}
+
+export interface CortePeriodo {
+  clave: string; // ordenable, ej. "2026-07", "2026-Q3", "2026-W28"
+  etiqueta: string; // legible, ej. "jul 2026", "Q3 2026", "Sem 28 · 2026"
+  cortes: number;
+  kg: number;
+  valor: number;
+  precioPromedioKg: number;
+}
+
+export interface CorteViajeResumen {
+  id: string;
+  codigo: string;
+  fecha: string;
+  destino: string | null;
+  estado: EstadoViaje;
+  ventas: number;
+  kg: number;
+  valor: number;
+  precioPromedioKg: number;
+}
+
+export interface CorteComprador {
+  compradorNombre: string;
+  cortes: number;
+  kg: number;
+  valor: number;
+}
+
+export interface ReportesCortes {
+  agrupacion: AgrupacionCorte;
+  totales: {
+    cortes: number;
+    kg: number;
+    valor: number;
+    precioPromedioKg: number;
+    ticketPromedio: number;
+  };
+  periodos: CortePeriodo[];
+  viajes: CorteViajeResumen[];
+  porComprador: CorteComprador[];
 }
 
 export interface TrillaProceso {

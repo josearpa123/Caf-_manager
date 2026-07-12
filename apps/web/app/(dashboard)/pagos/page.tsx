@@ -57,6 +57,9 @@ export default function PagosPage() {
             <Link href="/pagos/anticipos" className={buttonVariants({ variant: 'outline' })}>
               Anticipos
             </Link>
+            <Link href="/prestamos" className={buttonVariants({ variant: 'outline' })}>
+              Préstamos
+            </Link>
             <Link href="/pagos/nuevo" className={buttonVariants()}>
               Nuevo pago
             </Link>

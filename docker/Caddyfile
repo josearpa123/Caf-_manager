@@ -1,0 +1,11 @@
+# Caddy — reverse proxy con HTTPS automático (Let's Encrypt).
+# Requiere dos hostnames que apunten a la IP pública de la VM (ver DuckDNS).
+# Los dominios se pasan por variables de entorno APP_DOMAIN / API_DOMAIN.
+
+{$APP_DOMAIN} {
+	reverse_proxy web:3000
+}
+
+{$API_DOMAIN} {
+	reverse_proxy api:3001
+}

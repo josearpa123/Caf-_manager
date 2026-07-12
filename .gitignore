@@ -14,7 +14,9 @@ build/
 .env
 .env.local
 .env.*.local
+.env.prod
 !.env.example
+!.env.prod.example
 
 # Credenciales locales (nunca se suben)
 .credenciales-dev

@@ -18,6 +18,7 @@ const GRUPOS: Array<{ titulo: string; permisos: Permission[] }> = [
   { titulo: 'Ventas', permisos: ['VENTAS_VER', 'VENTAS_CREAR', 'VENTAS_EDITAR', 'VENTAS_ELIMINAR'] },
   { titulo: 'Pagos', permisos: ['PAGOS_VER', 'PAGOS_CREAR', 'PAGOS_EDITAR', 'PAGOS_ELIMINAR'] },
   { titulo: 'Anticipos', permisos: ['ANTICIPOS_VER', 'ANTICIPOS_CREAR', 'ANTICIPOS_EDITAR'] },
+  { titulo: 'Préstamos', permisos: ['PRESTAMOS_VER', 'PRESTAMOS_CREAR', 'PRESTAMOS_EDITAR'] },
   { titulo: 'Facturación', permisos: ['FACTURACION_VER', 'FACTURACION_EMITIR', 'FACTURACION_ANULAR'] },
   { titulo: 'Reportes', permisos: ['REPORTES_VER', 'REPORTES_EXPORTAR'] },
   { titulo: 'Usuarios y roles', permisos: ['USUARIOS_VER', 'USUARIOS_GESTIONAR', 'ROLES_GESTIONAR'] },

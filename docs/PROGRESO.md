@@ -2,7 +2,29 @@
 
 > Este archivo se actualiza al final de cada sesión de trabajo relevante. Es lo primero que hay que leer al retomar el proyecto (junto con `docs/requerimientos.md` para decisiones de diseño ya tomadas).
 
-**Última actualización:** 2026-07-10
+**Última actualización:** 2026-07-11
+
+## Módulo de Préstamos a proveedores (sesión 2026-07-11)
+
+Pedido del usuario: un módulo de préstamos, adicional a los ya existentes. Antes de construir se confirmaron 3 decisiones de diseño con el usuario: (1) se presta **al proveedor/caficultor** (financiación al productor), no es deuda propia del negocio; (2) **sin interés** — solo se lleva el capital prestado y sus abonos; (3) se devuelve con **abonos en efectivo/transferencia**, como pagos independientes al préstamo (NO se descuenta del café entregado — eso lo cubre el concepto ya existente de `Anticipo`). El préstamo es, por tanto, un concepto distinto del anticipo: el anticipo se concilia contra café, el préstamo se devuelve con dinero.
+
+- **Schema**: dos modelos nuevos + un enum. `Prestamo` (código `PRE-{año}-{secuencial}` único por tenant, proveedor, punto de compra, `monto`, `fecha`, `estado`: VIGENTE/PAGADO/CANCELADO, notas) y `AbonoPrestamo` (monto, `metodoPago`, referencia, notas; `onDelete: Cascade` desde el préstamo). Enum `EstadoPrestamo`. Nuevos permisos `PRESTAMOS_VER/CREAR/EDITAR` (mismo patrón que Anticipos). Migración `20260711175720_prestamos_proveedor`. Ambos modelos agregados a `TENANT_SCOPED_MODELS` y a `AUDITED_MODELS` (auditados automáticamente).
+- **Backend** (`src/modules/prestamos`, un solo service/controller):
+  - `POST /prestamos` — crea el préstamo en VIGENTE (valida proveedor y punto de compra activos, genera el código correlativo en transacción, mismo patrón que ContratoVenta).
+  - `GET /prestamos` (filtros: proveedor, punto de compra, estado, rango de fechas), `GET /prestamos/:id` — cada préstamo devuelve `saldoPendiente` y `totalAbonado` **calculados al vuelo** (no se persisten), coherente con Anticipo.
+  - `POST /prestamos/:id/abonos` — registra un abono; **CREDITO rechazado** con 400 (un abono es siempre caja real que entra); rechaza si el abono excede el saldo pendiente; si el abono salda el préstamo (tolerancia 0.01) lo marca `PAGADO` en la misma transacción; rechaza abonar a un préstamo no vigente.
+  - `PATCH /prestamos/:id/cancelar` — solo si está VIGENTE (el saldo pendiente queda sin cobrar).
+  - Verificado end-to-end con curl (tenant de prueba sembrado directo en DB): creación con código correlativo y saldo=monto, abono parcial (saldo baja, sigue VIGENTE), rechazo de abono que excede saldo, rechazo de CREDITO, abono final → transición automática a PAGADO con saldo 0, rechazo de abono a préstamo pagado, cancelación de un segundo préstamo → CANCELADO con rechazo de abono posterior y de re-cancelación, filtros por estado, y auditoría confirmada por query directa a `AuditLog` (2× Prestamo CREAR, 2× AbonoPrestamo CREAR, 2× Prestamo EDITAR por las transiciones PAGADO/CANCELADO).
+- **Frontend**: nuevo ítem de nav "Préstamos" (icono `HandCoins`) en el dashboard del tenant, más un acceso desde `/pagos`. `/prestamos` (listado con código, monto, saldo pendiente y badge de estado), `/prestamos/nuevo` (proveedor + punto de compra + monto + notas, mismo patrón que `/pagos/anticipos/nuevo`), `/prestamos/[id]` (resumen monto/abonado/saldo/estado, historial de abonos, formulario inline de abono acotado al saldo con `max`, y botón "Cancelar préstamo" con confirmación — visibles solo si VIGENTE). Grupo "Préstamos" agregado al grid de permisos en `/configuracion/roles`. `packages/shared-types`: `EstadoPrestamo`, `Prestamo`, `PrestamoDetalle`, `AbonoPrestamo` + los 3 permisos. Verificado con `pnpm build` limpio (turbo, api + web) y la ruta `/prestamos` sirviendo 200.
+
+### Integración con el estado de cuenta del proveedor (misma sesión)
+A pedido del usuario, se integró el saldo de préstamos en `GET /pagos/cuenta/:proveedorId` (`PagosService.estadoCuenta`): se agregaron `totalPrestado`, `totalAbonadoPrestamos` y `saldoPrestamosPendiente` (solo préstamos **VIGENTES** — los PAGADOS están en cero y los CANCELADOS anulados), más `saldoNeto` = `saldoPendienteEstimado` − `saldoPrestamosPendiente` (positivo = el negocio le debe neto; negativo = el proveedor debe neto). **No se alteró la semántica de `saldoPendienteEstimado`** (sigue siendo compras − pagos − conciliado); el préstamo es dinero en dirección opuesta (lo que el proveedor debe al negocio), por eso se muestra aparte y se netea explícitamente. Frontend `/pagos/cuenta` ampliado con las 3 tarjetas de préstamos + tarjeta de "Saldo neto" con leyenda de a favor de quién. `packages/shared-types` `EstadoCuentaProveedor` ampliado. Verificado con curl: préstamo vigente de 800k con abono de 300k → `saldoPrestamosPendiente` 500k, `saldoNeto` −500k, excluyendo correctamente los préstamos pagado/cancelado del mismo proveedor.
+
+### Pendiente / fuera de alcance
+- El préstamo aún **no aparece en el dashboard de Reportes** como KPI propio (el estado de cuenta del proveedor sí lo integra, ver arriba). Sería el mismo cálculo agregado por si se quiere un KPI de "préstamos por cobrar".
+- Sin interés por decisión explícita del usuario — si en el futuro se necesita, habría que agregar tasa + cálculo sobre saldo (no está modelado).
+- Los permisos nuevos `PRESTAMOS_*` se conceden automáticamente al rol "Administrador" al **crear** un tenant (`Object.values(Permission)` en registro/platform). Tenants creados **antes** de esta migración no los tienen en su rol Administrador hasta hacer backfill (agregar las filas `RolePermission` o reasignar permisos desde `/configuracion/roles`), porque el guard no tiene bypass de admin — resuelve permisos desde `RolePermission`.
+- Sin `PATCH`/`DELETE` de un préstamo o abono ya creados (mismo alcance deliberadamente limitado que Pagos/Anticipos: son registros financieros).
 
 ## Rediseño de dashboards + Solicitudes de registro (sesión 2026-07-10, continuación)
 

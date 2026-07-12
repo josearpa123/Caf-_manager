@@ -10,6 +10,8 @@ const AUDITED_MODELS = new Set([
   'Factura',
   'Anticipo',
   'ConciliacionAnticipo',
+  'Prestamo',
+  'AbonoPrestamo',
   'Venta',
   'ContratoVenta',
 ]);

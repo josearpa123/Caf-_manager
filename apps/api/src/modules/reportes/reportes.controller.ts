@@ -4,6 +4,7 @@ import { Permission } from '@prisma/client';
 import { ReportesService } from './reportes.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { QueryReportesDto } from './dto/query-reportes.dto';
+import { QueryCortesDto } from './dto/query-cortes.dto';
 
 @Controller('reportes')
 export class ReportesController {
@@ -13,6 +14,12 @@ export class ReportesController {
   @Get('dashboard')
   dashboard(@Query() query: QueryReportesDto) {
     return this.reportesService.dashboard(query);
+  }
+
+  @RequirePermissions(Permission.REPORTES_VER)
+  @Get('cortes')
+  cortes(@Query() query: QueryCortesDto) {
+    return this.reportesService.cortes(query);
   }
 
   @RequirePermissions(Permission.REPORTES_EXPORTAR)

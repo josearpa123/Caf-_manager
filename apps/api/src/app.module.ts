@@ -18,7 +18,9 @@ import { RecepcionModule } from './modules/recepcion/recepcion.module';
 import { CalidadModule } from './modules/calidad/calidad.module';
 import { BodegaModule } from './modules/bodega/bodega.module';
 import { VentasModule } from './modules/ventas/ventas.module';
+import { ViajesModule } from './modules/viajes/viajes.module';
 import { PagosModule } from './modules/pagos/pagos.module';
+import { PrestamosModule } from './modules/prestamos/prestamos.module';
 import { FacturacionModule } from './modules/facturacion/facturacion.module';
 import { ReportesModule } from './modules/reportes/reportes.module';
 
@@ -37,7 +39,9 @@ import { ReportesModule } from './modules/reportes/reportes.module';
     CalidadModule,
     BodegaModule,
     VentasModule,
+    ViajesModule,
     PagosModule,
+    PrestamosModule,
     FacturacionModule,
     ReportesModule,
   ],

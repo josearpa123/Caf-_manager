@@ -1,0 +1,32 @@
+# Overlay OPCIONAL para servir con HTTPS detrás de Caddy.
+# Requiere un dominio (p.ej. DuckDNS gratis) apuntando a la IP de la VM y estas
+# variables en .env.prod:
+#     APP_DOMAIN=cafe.tudominio.duckdns.org
+#     API_DOMAIN=api.tudominio.duckdns.org
+# y NEXT_PUBLIC_API_URL=https://api.tudominio.duckdns.org
+#
+# Uso:
+#   docker compose --env-file .env.prod \
+#     -f docker/docker-compose.prod.yml -f docker/docker-compose.tls.yml \
+#     up -d --build
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+
+volumes:
+  caddy_data:
+  caddy_config:

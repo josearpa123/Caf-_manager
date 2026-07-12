@@ -5,8 +5,62 @@ import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator'
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { BodegaService } from '../bodega/bodega.service';
 import { QueryReportesDto } from './dto/query-reportes.dto';
+import { AgrupacionCorte, QueryCortesDto } from './dto/query-cortes.dto';
 
 const TOP_PROVEEDORES_SALDO = 10;
+
+const MESES_ES = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+];
+
+// Número de semana ISO-8601 (la semana empieza en lunes; la semana 1 es la que
+// contiene el primer jueves del año). Devuelve el año ISO, que puede diferir del
+// año calendario en los bordes de diciembre/enero.
+function isoWeek(date: Date): { year: number; week: number } {
+  const d = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+  const dayNum = d.getUTCDay() || 7; // domingo (0) -> 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum); // jueves de esta semana
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(
+    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+  );
+  return { year: d.getUTCFullYear(), week };
+}
+
+// Clave ordenable + etiqueta legible del período al que pertenece una fecha,
+// según la agrupación pedida.
+function periodoDe(
+  fecha: Date,
+  agrupacion: AgrupacionCorte,
+): { clave: string; etiqueta: string } {
+  const year = fecha.getUTCFullYear();
+  const month = fecha.getUTCMonth();
+  if (agrupacion === 'semana') {
+    const { year: wy, week } = isoWeek(fecha);
+    const ww = String(week).padStart(2, '0');
+    return { clave: `${wy}-W${ww}`, etiqueta: `Sem ${week} · ${wy}` };
+  }
+  if (agrupacion === 'trimestre') {
+    const q = Math.floor(month / 3) + 1;
+    return { clave: `${year}-Q${q}`, etiqueta: `Q${q} ${year}` };
+  }
+  // mes (por defecto)
+  const mm = String(month + 1).padStart(2, '0');
+  return { clave: `${year}-${mm}`, etiqueta: `${MESES_ES[month]} ${year}` };
+}
 
 function buildFechaWhere(
   desde?: string,
@@ -147,6 +201,123 @@ export class ReportesService {
       },
       inventario,
       saldoProveedores,
+    };
+  }
+
+  // Reporte por "cortes de entrega" (viajes): estadística de lo que se
+  // despacha/vende, agrupada por período (semana/mes/trimestre) y detallada
+  // corte por corte. Un corte agrupa varias ventas de un mismo despacho.
+  async cortes(query: QueryCortesDto) {
+    const agrupacion: AgrupacionCorte = query.agrupacion ?? 'mes';
+    const fecha = buildFechaWhere(query.desde, query.hasta);
+
+    const viajes = await this.prisma.viaje.findMany({
+      where: { fecha },
+      include: {
+        ventas: {
+          where: { puntoCompraId: query.puntoCompraId },
+          select: {
+            cantidadKg: true,
+            valorTotal: true,
+            compradorNombre: true,
+          },
+        },
+      },
+      orderBy: { fecha: 'asc' },
+    });
+
+    // Si se filtra por punto de compra, un corte sin ventas de ese punto no
+    // aporta nada al reporte → se excluye.
+    const relevantes = query.puntoCompraId
+      ? viajes.filter((v) => v.ventas.length > 0)
+      : viajes;
+
+    const periodosMap = new Map<
+      string,
+      { clave: string; etiqueta: string; cortes: number; kg: number; valor: number }
+    >();
+    const compradoresMap = new Map<
+      string,
+      { compradorNombre: string; viajes: Set<string>; kg: number; valor: number }
+    >();
+
+    const viajesResumen = relevantes.map((v) => {
+      const kg = v.ventas.reduce((acc, x) => acc + Number(x.cantidadKg), 0);
+      const valor = v.ventas.reduce((acc, x) => acc + Number(x.valorTotal), 0);
+
+      const { clave, etiqueta } = periodoDe(v.fecha, agrupacion);
+      const bucket = periodosMap.get(clave) ?? {
+        clave,
+        etiqueta,
+        cortes: 0,
+        kg: 0,
+        valor: 0,
+      };
+      bucket.cortes += 1;
+      bucket.kg += kg;
+      bucket.valor += valor;
+      periodosMap.set(clave, bucket);
+
+      for (const venta of v.ventas) {
+        const nombre = venta.compradorNombre || 'Sin comprador';
+        const c = compradoresMap.get(nombre) ?? {
+          compradorNombre: nombre,
+          viajes: new Set<string>(),
+          kg: 0,
+          valor: 0,
+        };
+        c.viajes.add(v.id);
+        c.kg += Number(venta.cantidadKg);
+        c.valor += Number(venta.valorTotal);
+        compradoresMap.set(nombre, c);
+      }
+
+      return {
+        id: v.id,
+        codigo: v.codigo,
+        fecha: v.fecha.toISOString(),
+        destino: v.destino,
+        estado: v.estado,
+        ventas: v.ventas.length,
+        kg,
+        valor,
+        precioPromedioKg: kg > 0 ? valor / kg : 0,
+      };
+    });
+
+    const periodos = Array.from(periodosMap.values())
+      .sort((a, b) => a.clave.localeCompare(b.clave))
+      .map((p) => ({
+        ...p,
+        precioPromedioKg: p.kg > 0 ? p.valor / p.kg : 0,
+      }));
+
+    const porComprador = Array.from(compradoresMap.values())
+      .map((c) => ({
+        compradorNombre: c.compradorNombre,
+        cortes: c.viajes.size,
+        kg: c.kg,
+        valor: c.valor,
+      }))
+      .sort((a, b) => b.valor - a.valor);
+
+    const totalKg = viajesResumen.reduce((acc, v) => acc + v.kg, 0);
+    const totalValor = viajesResumen.reduce((acc, v) => acc + v.valor, 0);
+    const totalCortes = viajesResumen.length;
+
+    return {
+      agrupacion,
+      totales: {
+        cortes: totalCortes,
+        kg: totalKg,
+        valor: totalValor,
+        precioPromedioKg: totalKg > 0 ? totalValor / totalKg : 0,
+        ticketPromedio: totalCortes > 0 ? totalValor / totalCortes : 0,
+      },
+      periodos,
+      // Del más reciente al más antiguo para la tabla de detalle.
+      viajes: viajesResumen.slice().reverse(),
+      porComprador,
     };
   }
 

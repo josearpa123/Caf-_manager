@@ -16,12 +16,21 @@ function formatMoney(value: number) {
   }).format(value);
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
   return (
     <Card>
       <CardContent className="pt-6">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className="mt-1 text-xl font-semibold">{value}</p>
+        {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
       </CardContent>
     </Card>
   );
@@ -53,7 +62,7 @@ export default function EstadoCuentaPage() {
     <div className="p-8">
       <PageHeader
         title="Estado de cuenta por proveedor"
-        description="Resumen informativo a partir de compras, pagos y anticipos. La reconciliación entre anticipos y compras es manual, así que el saldo estimado es una referencia, no un valor autoritativo."
+        description="Resumen informativo a partir de compras, pagos, anticipos y préstamos. La reconciliación entre anticipos y compras es manual, así que el saldo estimado es una referencia, no un valor autoritativo."
       />
 
       <div className="mt-6 flex max-w-xs flex-col gap-1.5">
@@ -82,8 +91,36 @@ export default function EstadoCuentaPage() {
           <StatCard label="Total anticipado" value={formatMoney(cuenta.totalAnticipos)} />
           <StatCard label="Anticipos conciliados" value={formatMoney(cuenta.totalConciliado)} />
           <StatCard label="Anticipos sin conciliar" value={formatMoney(cuenta.anticiposSinConciliar)} />
-          <div className="col-span-3">
-            <StatCard label="Saldo pendiente estimado" value={formatMoney(cuenta.saldoPendienteEstimado)} />
+
+          <StatCard
+            label="Préstamos vigentes (prestado)"
+            value={formatMoney(cuenta.totalPrestado)}
+          />
+          <StatCard
+            label="Abonado a préstamos"
+            value={formatMoney(cuenta.totalAbonadoPrestamos)}
+          />
+          <StatCard
+            label="Saldo de préstamos por cobrar"
+            value={formatMoney(cuenta.saldoPrestamosPendiente)}
+            hint="Lo que el proveedor debe al negocio"
+          />
+
+          <div className="col-span-3 grid grid-cols-2 gap-4">
+            <StatCard
+              label="Saldo pendiente estimado"
+              value={formatMoney(cuenta.saldoPendienteEstimado)}
+              hint="Lo que el negocio le debe (compras − pagos − anticipos conciliados)"
+            />
+            <StatCard
+              label="Saldo neto"
+              value={formatMoney(cuenta.saldoNeto)}
+              hint={
+                cuenta.saldoNeto >= 0
+                  ? 'A favor del proveedor (el negocio le debe neto)'
+                  : 'A favor del negocio (el proveedor debe neto)'
+              }
+            />
           </div>
         </div>
       )}

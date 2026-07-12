@@ -9,16 +9,20 @@ COPY packages packages
 RUN pnpm install --frozen-lockfile --filter web...
 
 FROM deps AS build
+# NEXT_PUBLIC_* se hornea en el bundle EN BUILD-TIME: el navegador del usuario
+# usa esta URL para llamar a la API, así que debe apuntar al host público, no a
+# localhost. Se pasa como build-arg desde docker-compose.prod.yml.
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY apps/web apps/web
 RUN pnpm --filter web build
 
 FROM base AS runtime
 ENV NODE_ENV=production
+# Copiamos el árbol /repo completo: pnpm enlaza node_modules por symlinks al
+# store (.pnpm) y a los packages del workspace, así que copiar solo apps/web
+# dejaría enlaces colgando. Copiar /repo entero mantiene todo resuelto.
+COPY --from=build /repo /repo
 WORKDIR /repo/apps/web
-COPY --from=build /repo/apps/web/.next .next
-COPY --from=build /repo/apps/web/public public
-COPY --from=build /repo/apps/web/node_modules node_modules
-COPY --from=build /repo/apps/web/package.json package.json
-COPY --from=build /repo/apps/web/next.config.mjs next.config.mjs
 EXPOSE 3000
 CMD ["node_modules/.bin/next", "start"]

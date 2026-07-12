@@ -1,17 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
-import type { PuntoCompra, ReportesDashboard } from '@coffee-manager/shared-types';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Download, Truck } from 'lucide-react';
+import type {
+  AgrupacionCorte,
+  PuntoCompra,
+  ReportesCortes,
+  ReportesDashboard,
+} from '@coffee-manager/shared-types';
 import { api, ApiError, getToken } from '@/lib/api';
 import { PageHeader } from '@/components/shell/page-header';
 import { StatCard } from '@/components/shell/stat-card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { BarChart, HBar } from '@/components/charts/bar-chart';
 import {
   Table,
   TableBody,
@@ -33,6 +40,31 @@ function formatMoney(value: number) {
   }).format(value);
 }
 
+// Versión compacta para etiquetas de gráficos (ej. $1,2 M).
+function formatMoneyShort(value: number) {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
+  return `$${value.toFixed(0)}`;
+}
+
+function formatKg(value: number) {
+  return `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(value)} kg`;
+}
+
+const AGRUPACIONES: { value: 'semana' | 'mes' | 'trimestre'; label: string }[] = [
+  { value: 'semana', label: 'Semana' },
+  { value: 'mes', label: 'Mes' },
+  { value: 'trimestre', label: 'Trimestre' },
+];
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('es-CO', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 export default function ReportesPage() {
   const [puntosCompra, setPuntosCompra] = useState<PuntoCompra[]>([]);
   const [puntoCompraId, setPuntoCompraId] = useState('');
@@ -40,6 +72,8 @@ export default function ReportesPage() {
   const [hasta, setHasta] = useState('');
 
   const [data, setData] = useState<ReportesDashboard | null>(null);
+  const [cortes, setCortes] = useState<ReportesCortes | null>(null);
+  const [agrupacion, setAgrupacion] = useState<AgrupacionCorte>('mes');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [exportando, setExportando] = useState<'excel' | 'csv' | null>(null);
@@ -48,23 +82,46 @@ export default function ReportesPage() {
     api.get<PuntoCompra[]>('/puntos-compra').then(setPuntosCompra).catch(() => {});
   }, []);
 
-  const load = () => {
-    setIsLoading(true);
-    setError(null);
+  const baseParams = useCallback(() => {
     const params = new URLSearchParams();
     if (puntoCompraId) params.set('puntoCompraId', puntoCompraId);
     if (desde) params.set('desde', desde);
     if (hasta) params.set('hasta', hasta);
+    return params;
+  }, [puntoCompraId, desde, hasta]);
+
+  const fetchCortes = useCallback(
+    (ag: AgrupacionCorte) => {
+      const params = baseParams();
+      params.set('agrupacion', ag);
+      api
+        .get<ReportesCortes>(`/reportes/cortes?${params.toString()}`)
+        .then(setCortes)
+        .catch(() => setCortes(null));
+    },
+    [baseParams],
+  );
+
+  const load = () => {
+    setIsLoading(true);
+    setError(null);
     api
-      .get<ReportesDashboard>(`/reportes/dashboard?${params.toString()}`)
+      .get<ReportesDashboard>(`/reportes/dashboard?${baseParams().toString()}`)
       .then(setData)
       .catch((err) =>
         setError(err instanceof ApiError ? err.message : 'No se pudo cargar el dashboard'),
       )
       .finally(() => setIsLoading(false));
+    fetchCortes(agrupacion);
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, []);
+
+  const onAgrupacionChange = (ag: AgrupacionCorte) => {
+    setAgrupacion(ag);
+    fetchCortes(ag);
+  };
 
   const exportar = async (tipo: 'excel' | 'csv') => {
     setExportando(tipo);
@@ -143,6 +200,159 @@ export default function ReportesPage() {
       </div>
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+
+      {/* ===================== CORTES DE ENTREGA ===================== */}
+      <section className="mt-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-medium">
+              <Truck className="h-5 w-5 text-primary" />
+              Cortes de entrega
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Lo que despachas por viaje, agrupado por {agrupacion === 'semana' ? 'semana' : agrupacion === 'trimestre' ? 'trimestre' : 'mes'}.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="inline-flex rounded-md border p-0.5">
+              {AGRUPACIONES.map((a) => (
+                <button
+                  key={a.value}
+                  type="button"
+                  onClick={() => onAgrupacionChange(a.value)}
+                  className={
+                    'rounded px-3 py-1 text-sm transition-colors ' +
+                    (agrupacion === a.value
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground')
+                  }
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+            <Link href="/cortes" className={buttonVariants({ variant: 'outline' })}>
+              Gestionar cortes
+            </Link>
+          </div>
+        </div>
+
+        {cortes && (
+          <>
+            <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-5">
+              <StatCard label="Cortes / viajes" value={String(cortes.totales.cortes)} />
+              <StatCard label="Total despachado" value={formatKg(cortes.totales.kg)} />
+              <StatCard label="Valor total" value={formatMoney(cortes.totales.valor)} />
+              <StatCard label="Ticket promedio" value={formatMoney(cortes.totales.ticketPromedio)} />
+              <StatCard
+                label="Precio promedio/kg"
+                value={formatMoney(cortes.totales.precioPromedioKg)}
+              />
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm font-medium">Valor vendido por período</p>
+                  <div className="mt-4">
+                    <BarChart
+                      data={cortes.periodos.map((p) => ({
+                        label: p.etiqueta,
+                        value: p.valor,
+                      }))}
+                      formatValue={formatMoneyShort}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm font-medium">Kg despachados por período</p>
+                  <div className="mt-4">
+                    <BarChart
+                      data={cortes.periodos.map((p) => ({
+                        label: p.etiqueta,
+                        value: p.kg,
+                      }))}
+                      formatValue={(v) => new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(v)}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm font-medium">Ventas por comprador</p>
+                  <div className="mt-4 flex flex-col gap-3">
+                    {cortes.porComprador.length === 0 && (
+                      <p className="text-sm text-muted-foreground">Sin datos en el período.</p>
+                    )}
+                    {cortes.porComprador.slice(0, 8).map((c) => (
+                      <HBar
+                        key={c.compradorNombre}
+                        label={`${c.compradorNombre} · ${c.cortes} corte${c.cortes === 1 ? '' : 's'}`}
+                        value={c.valor}
+                        max={cortes.porComprador[0]?.valor ?? 0}
+                        valueText={`${formatMoney(c.valor)} · ${formatKg(c.kg)}`}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Detalle de cortes</p>
+                    <span className="text-xs text-muted-foreground">
+                      {cortes.viajes.length} corte{cortes.viajes.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <div className="mt-3 max-h-[320px] overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Corte</TableHead>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead className="text-right">Kg</TableHead>
+                          <TableHead className="text-right">Valor</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cortes.viajes.length === 0 && (
+                          <TableEmpty colSpan={4}>Sin cortes en el período.</TableEmpty>
+                        )}
+                        {cortes.viajes.map((v) => (
+                          <TableRow key={v.id}>
+                            <TableCell className="font-medium">
+                              <Link href={`/cortes/${v.id}`} className="hover:underline">
+                                {v.codigo}
+                              </Link>
+                              {v.destino && (
+                                <span className="block text-xs text-muted-foreground">
+                                  {v.destino}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>{formatDate(v.fecha)}</TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {v.kg.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium tabular-nums">
+                              {formatMoney(v.valor)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
+      </section>
 
       {data && (
         <>

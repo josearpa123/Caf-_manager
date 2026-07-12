@@ -122,24 +122,31 @@ export class PagosService {
     });
     if (!proveedor) throw new NotFoundException('Proveedor no encontrado');
 
-    const [recepciones, pagos, anticipos, conciliaciones] = await Promise.all([
-      this.prisma.recepcion.findMany({
-        where: { proveedorId },
-        select: { valorTotal: true },
-      }),
-      this.prisma.pago.findMany({
-        where: { proveedorId },
-        select: { monto: true, metodoPago: true },
-      }),
-      this.prisma.anticipo.findMany({
-        where: { proveedorId },
-        select: { monto: true },
-      }),
-      this.prisma.conciliacionAnticipo.findMany({
-        where: { proveedorId },
-        select: { montoAplicado: true },
-      }),
-    ]);
+    const [recepciones, pagos, anticipos, conciliaciones, prestamosVigentes] =
+      await Promise.all([
+        this.prisma.recepcion.findMany({
+          where: { proveedorId },
+          select: { valorTotal: true },
+        }),
+        this.prisma.pago.findMany({
+          where: { proveedorId },
+          select: { monto: true, metodoPago: true },
+        }),
+        this.prisma.anticipo.findMany({
+          where: { proveedorId },
+          select: { monto: true },
+        }),
+        this.prisma.conciliacionAnticipo.findMany({
+          where: { proveedorId },
+          select: { montoAplicado: true },
+        }),
+        // Solo préstamos VIGENTES tienen saldo por cobrar: los PAGADOS ya
+        // están en cero y los CANCELADOS se anularon.
+        this.prisma.prestamo.findMany({
+          where: { proveedorId, estado: 'VIGENTE' },
+          select: { monto: true, abonos: { select: { monto: true } } },
+        }),
+      ]);
 
     const totalComprado = recepciones.reduce(
       (acc, r) => acc + Number(r.valorTotal),
@@ -160,6 +167,21 @@ export class PagosService {
       0,
     );
 
+    // Préstamos: dinero que el proveedor debe AL negocio (dirección opuesta a
+    // las compras, que el negocio le debe a él).
+    const totalPrestado = prestamosVigentes.reduce(
+      (acc, p) => acc + Number(p.monto),
+      0,
+    );
+    const totalAbonadoPrestamos = prestamosVigentes.reduce(
+      (acc, p) => acc + p.abonos.reduce((s, a) => s + Number(a.monto), 0),
+      0,
+    );
+    const saldoPrestamosPendiente = totalPrestado - totalAbonadoPrestamos;
+
+    const saldoPendienteEstimado =
+      totalComprado - totalPagadoEfectivo - totalConciliado;
+
     return {
       proveedorId: proveedor.id,
       proveedorNombre: proveedor.nombre,
@@ -169,8 +191,14 @@ export class PagosService {
       totalAnticipos,
       totalConciliado,
       anticiposSinConciliar: totalAnticipos - totalConciliado,
-      saldoPendienteEstimado:
-        totalComprado - totalPagadoEfectivo - totalConciliado,
+      saldoPendienteEstimado,
+      totalPrestado,
+      totalAbonadoPrestamos,
+      saldoPrestamosPendiente,
+      // Saldo neto entre lo que el negocio le debe (compras pendientes) y lo
+      // que el proveedor debe (préstamos vigentes). Positivo = el negocio le
+      // debe neto; negativo = el proveedor debe neto.
+      saldoNeto: saldoPendienteEstimado - saldoPrestamosPendiente,
     };
   }
 }
