@@ -8,9 +8,10 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { Permission } from '@prisma/client';
+import { Modulo, Permission } from '@prisma/client';
 import { ViajesService } from './viajes.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { RequireModulo } from '../../common/decorators/require-modulo.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateViajeDto } from './dto/create-viaje.dto';
 import { UpdateViajeDto } from './dto/update-viaje.dto';
@@ -20,6 +21,7 @@ import { AsignarVentasDto } from './dto/asignar-ventas.dto';
 // Un "corte de entrega" / viaje agrupa varias ventas de un mismo despacho.
 // Reutiliza los permisos de VENTAS (es parte del flujo de despacho/venta).
 @Controller('viajes')
+@RequireModulo(Modulo.CORTES)
 export class ViajesController {
   constructor(private readonly viajesService: ViajesService) {}
 

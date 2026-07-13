@@ -89,12 +89,21 @@ export class PlatformService {
     }));
   }
 
+  // Un plan sin módulos deja al tenant sin nada que usar (todo le daría 403),
+  // así que se puede armar pero no asignar. Ver ModuloGuard.
+  private async assertPlanAsignable(planId: string) {
+    const plan = await this.prisma.plan.findUnique({ where: { id: planId } });
+    if (!plan) throw new BadRequestException('El plan indicado no existe');
+    if (plan.modulos.length === 0) {
+      throw new BadRequestException(
+        `El plan "${plan.nombre}" no tiene módulos: el tenant no podría usar nada. Agrégale módulos antes de asignarlo.`,
+      );
+    }
+  }
+
   async updateTenant(id: string, dto: UpdateTenantPlatformDto) {
     if (dto.planId) {
-      const plan = await this.prisma.plan.findUnique({
-        where: { id: dto.planId },
-      });
-      if (!plan) throw new BadRequestException('El plan indicado no existe');
+      await this.assertPlanAsignable(dto.planId);
     }
     const tenant = await this.prisma.tenant.findUnique({ where: { id } });
     if (!tenant) throw new NotFoundException('Tenant no encontrado');
@@ -126,10 +135,7 @@ export class PlatformService {
   // el tenant.
   async createTenant(dto: CreateTenantDto) {
     if (dto.planId) {
-      const plan = await this.prisma.plan.findUnique({
-        where: { id: dto.planId },
-      });
-      if (!plan) throw new BadRequestException('El plan indicado no existe');
+      await this.assertPlanAsignable(dto.planId);
     }
 
     const passwordHash = await bcrypt.hash(dto.adminPassword, 10);

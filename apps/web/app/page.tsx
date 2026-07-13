@@ -3,8 +3,17 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Coffee, Droplets, Handshake, ShieldCheck, Sprout, Wallet } from 'lucide-react';
-import type { PlanPublico } from '@coffee-manager/shared-types';
+import {
+  Check,
+  Coffee,
+  Droplets,
+  Handshake,
+  ShieldCheck,
+  Sprout,
+  Wallet,
+  X,
+} from 'lucide-react';
+import { MODULOS, type PlanPublico } from '@coffee-manager/shared-types';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { buttonVariants } from '@/components/ui/button';
@@ -12,6 +21,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { CoffeeIllustration } from '@/components/marketing/coffee-illustration';
 import { GrainOverlay } from '@/components/marketing/grain-overlay';
+
+// Sin decimales: los planes se cotizan en pesos redondos.
+const PRECIO = new Intl.NumberFormat('es-CO', {
+  style: 'currency',
+  currency: 'COP',
+  maximumFractionDigits: 0,
+});
 
 const CARACTERISTICAS = [
   {
@@ -240,21 +256,33 @@ export default function LandingPage() {
                       <CardTitle className="font-display text-xl font-normal">
                         {p.nombre}
                       </CardTitle>
+                      <p className="pt-1">
+                        {p.precioMensual !== null ? (
+                          <>
+                            <strong className="font-display text-3xl font-normal tracking-tight text-foreground">
+                              {PRECIO.format(p.precioMensual)}
+                            </strong>
+                            <span className="text-sm text-muted-foreground"> /mes</span>
+                          </>
+                        ) : (
+                          <span className="font-display text-2xl font-normal text-muted-foreground">
+                            A convenir
+                          </span>
+                        )}
+                      </p>
                     </CardHeader>
-                    <CardContent className="flex flex-1 flex-col gap-4">
-                      <ul className="flex-1 space-y-2.5 text-sm text-muted-foreground">
+                    <CardContent className="flex flex-1 flex-col gap-5">
+                      <ul className="space-y-1.5 text-sm text-muted-foreground">
                         <li>
                           Hasta{' '}
-                          <strong className="font-display text-base font-normal text-foreground">
-                            {p.maxUsuarios}
-                          </strong>{' '}
+                          <strong className="font-medium text-foreground">{p.maxUsuarios}</strong>{' '}
                           usuario{p.maxUsuarios === 1 ? '' : 's'}
                         </li>
                         <li>
                           {p.maxPuntosCompra ? (
                             <>
                               Hasta{' '}
-                              <strong className="font-display text-base font-normal text-foreground">
+                              <strong className="font-medium text-foreground">
                                 {p.maxPuntosCompra}
                               </strong>{' '}
                               punto{p.maxPuntosCompra === 1 ? '' : 's'} de compra
@@ -264,6 +292,43 @@ export default function LandingPage() {
                           )}
                         </li>
                       </ul>
+
+                      {/* Se listan TODOS los módulos, incluidos y no incluidos: lo
+                          que el plan no trae se ve tachado, para que la diferencia
+                          entre planes quede explícita. */}
+                      <ul className="flex-1 space-y-2 border-t border-border/70 pt-4 text-sm">
+                        {MODULOS.map((m) => {
+                          const incluido = p.modulos.includes(m.value);
+                          return (
+                            <li key={m.value} className="flex items-start gap-2.5">
+                              {incluido ? (
+                                <Check
+                                  className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <X
+                                  className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/40"
+                                  aria-hidden="true"
+                                />
+                              )}
+                              <span
+                                className={cn(
+                                  incluido
+                                    ? 'text-foreground'
+                                    : 'text-muted-foreground/50 line-through',
+                                )}
+                              >
+                                {m.label}
+                              </span>
+                              <span className="sr-only">
+                                {incluido ? '(incluido)' : '(no incluido)'}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+
                       <Link href="/register" className={buttonVariants({ variant: 'outline' })}>
                         Elegir {p.nombre}
                       </Link>

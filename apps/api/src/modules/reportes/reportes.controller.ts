@@ -1,12 +1,14 @@
 import { Controller, Get, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { Permission } from '@prisma/client';
+import { Modulo, Permission } from '@prisma/client';
 import { ReportesService } from './reportes.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { RequireModulo } from '../../common/decorators/require-modulo.decorator';
 import { QueryReportesDto } from './dto/query-reportes.dto';
 import { QueryCortesDto } from './dto/query-cortes.dto';
 
 @Controller('reportes')
+@RequireModulo(Modulo.REPORTES)
 export class ReportesController {
   constructor(private readonly reportesService: ReportesService) {}
 

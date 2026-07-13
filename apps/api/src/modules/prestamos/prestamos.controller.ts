@@ -1,13 +1,15 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { Permission } from '@prisma/client';
+import { Modulo, Permission } from '@prisma/client';
 import { PrestamosService } from './prestamos.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { RequireModulo } from '../../common/decorators/require-modulo.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreatePrestamoDto } from './dto/create-prestamo.dto';
 import { CreateAbonoPrestamoDto } from './dto/create-abono-prestamo.dto';
 import { QueryPrestamosDto } from './dto/query-prestamos.dto';
 
 @Controller('prestamos')
+@RequireModulo(Modulo.PRESTAMOS)
 export class PrestamosController {
   constructor(private readonly prestamosService: PrestamosService) {}
 

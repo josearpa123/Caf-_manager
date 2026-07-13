@@ -86,10 +86,14 @@ export default function NuevoTenantPage() {
           <Label htmlFor="planId">Plan</Label>
           <Select id="planId" value={planId} onChange={(e) => setPlanId(e.target.value)}>
             <option value="">Sin plan (sin límite de usuarios/puntos de compra)</option>
+            {/* Un plan sin módulos no se puede asignar: el tenant no podría
+                usar nada. Se deja visible para que se vea que está a medio
+                armar, pero deshabilitado. */}
             {planes.map((p) => (
-              <option key={p.id} value={p.id}>
+              <option key={p.id} value={p.id} disabled={p.modulos.length === 0}>
                 {p.nombre} — hasta {p.maxUsuarios} usuarios
                 {p.maxPuntosCompra ? `, ${p.maxPuntosCompra} puntos de compra` : ''}
+                {p.modulos.length === 0 ? ' (sin módulos, no asignable)' : ''}
               </option>
             ))}
           </Select>

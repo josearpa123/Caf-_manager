@@ -1,12 +1,14 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { Permission } from '@prisma/client';
+import { Modulo, Permission } from '@prisma/client';
 import { TablaPreciosService } from './tabla-precios.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { RequireModulo } from '../../common/decorators/require-modulo.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateTablaPrecioTramoDto } from './dto/create-tabla-precio-tramo.dto';
 import { QueryTablaPreciosDto } from './dto/query-tabla-precios.dto';
 
 @Controller('tabla-precios')
+@RequireModulo(Modulo.RECEPCION)
 export class TablaPreciosController {
   constructor(private readonly tablaPreciosService: TablaPreciosService) {}
 

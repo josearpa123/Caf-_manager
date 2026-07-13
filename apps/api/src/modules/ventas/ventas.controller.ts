@@ -1,12 +1,14 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { Permission } from '@prisma/client';
+import { Modulo, Permission } from '@prisma/client';
 import { VentasService } from './ventas.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { RequireModulo } from '../../common/decorators/require-modulo.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateVentaDto } from './dto/create-venta.dto';
 import { QueryVentasDto } from './dto/query-ventas.dto';
 
 @Controller('ventas')
+@RequireModulo(Modulo.VENTAS)
 export class VentasController {
   constructor(private readonly ventasService: VentasService) {}
 

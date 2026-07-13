@@ -23,6 +23,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       tenantId: payload.tenantId,
       roles: payload.roles,
       permissions: payload.permissions,
+      // Tokens emitidos antes de que existieran los planes por módulo no
+      // traen el campo: se tratan como "sin restricción", igual que un
+      // tenant sin plan, en vez de dejar al usuario sin ningún módulo.
+      modulos: payload.modulos ?? null,
       puntoCompraId: payload.puntoCompraId,
     };
   }

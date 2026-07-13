@@ -1,12 +1,14 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { Permission } from '@prisma/client';
+import { Modulo, Permission } from '@prisma/client';
 import { AnticiposService } from './anticipos.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { RequireModulo } from '../../common/decorators/require-modulo.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateAnticipoDto } from './dto/create-anticipo.dto';
 import { QueryAnticiposDto } from './dto/query-anticipos.dto';
 
 @Controller('anticipos')
+@RequireModulo(Modulo.PAGOS)
 export class AnticiposController {
   constructor(private readonly anticiposService: AnticiposService) {}
 

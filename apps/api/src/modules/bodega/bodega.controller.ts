@@ -1,12 +1,14 @@
 import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
-import { Permission } from '@prisma/client';
+import { Modulo, Permission } from '@prisma/client';
 import { BodegaService } from './bodega.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { RequireModulo } from '../../common/decorators/require-modulo.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { QueryPuntoCompraDto } from './dto/query-punto-compra.dto';
 import { DecidirDestinoPasillaDto } from './dto/decidir-destino-pasilla.dto';
 
 @Controller('bodega')
+@RequireModulo(Modulo.BODEGA)
 export class BodegaController {
   constructor(private readonly bodegaService: BodegaService) {}
 

@@ -461,17 +461,89 @@ export interface TenantSelf {
   _count: { users: number; puntosCompra: number };
 }
 
+// Módulos con los que la plataforma arma un Plan. La administración del
+// tenant (usuarios, roles, puntos de compra, configuración) no es un módulo:
+// va siempre incluida, sin importar el plan.
+export const Modulo = {
+  PROVEEDORES: 'PROVEEDORES',
+  RECEPCION: 'RECEPCION',
+  BODEGA: 'BODEGA',
+  VENTAS: 'VENTAS',
+  CORTES: 'CORTES',
+  PAGOS: 'PAGOS',
+  PRESTAMOS: 'PRESTAMOS',
+  FACTURACION: 'FACTURACION',
+  REPORTES: 'REPORTES',
+} as const;
+export type Modulo = (typeof Modulo)[keyof typeof Modulo];
+
+// Catálogo ordenado: es la fuente de verdad para pintar la lista de
+// características (con chulo o equis) en la landing y las casillas del
+// armador de planes en /platform/planes.
+export const MODULOS: { value: Modulo; label: string; descripcion: string }[] = [
+  {
+    value: Modulo.PROVEEDORES,
+    label: 'Proveedores',
+    descripcion: 'Ficha de cada caficultor, historial y saldos',
+  },
+  {
+    value: Modulo.RECEPCION,
+    label: 'Recepción y calidad',
+    descripcion: 'Compra de café, factor de rendimiento, humedad y tabla de precios',
+  },
+  {
+    value: Modulo.BODEGA,
+    label: 'Bodega',
+    descripcion: 'Inventario, secado, trilla y ajustes',
+  },
+  {
+    value: Modulo.VENTAS,
+    label: 'Ventas',
+    descripcion: 'Compradores, contratos y despachos',
+  },
+  {
+    value: Modulo.CORTES,
+    label: 'Cortes y viajes',
+    descripcion: 'Cortes de café y entregas a la trilladora',
+  },
+  {
+    value: Modulo.PAGOS,
+    label: 'Pagos',
+    descripcion: 'Pagos a proveedores, anticipos y conciliaciones',
+  },
+  {
+    value: Modulo.PRESTAMOS,
+    label: 'Préstamos',
+    descripcion: 'Préstamos a proveedores y descuento contra entregas',
+  },
+  {
+    value: Modulo.FACTURACION,
+    label: 'Facturación electrónica',
+    descripcion: 'Emisión de facturas ante la DIAN',
+  },
+  {
+    value: Modulo.REPORTES,
+    label: 'Reportes',
+    descripcion: 'Informes de compra, inventario y cartera',
+  },
+];
+
 export interface Plan {
   id: string;
   nombre: string;
+  precioMensual: number | null;
   maxUsuarios: number;
   maxPuntosCompra: number | null;
+  modulos: Modulo[];
   createdAt: string;
 }
 
 // Forma reducida de Plan que devuelve el endpoint público /registro/planes
 // (sin createdAt ni nada interno).
-export type PlanPublico = Pick<Plan, 'id' | 'nombre' | 'maxUsuarios' | 'maxPuntosCompra'>;
+export type PlanPublico = Pick<
+  Plan,
+  'id' | 'nombre' | 'precioMensual' | 'maxUsuarios' | 'maxPuntosCompra' | 'modulos'
+>;
 
 export interface PlatformTenant {
   id: string;

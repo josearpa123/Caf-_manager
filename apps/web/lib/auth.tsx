@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import type { Modulo } from '@coffee-manager/shared-types';
 import {
   api,
   clearRefreshToken,
@@ -25,6 +26,9 @@ interface AuthUser {
   tenantId: string;
   roles: string[];
   permissions: string[];
+  // Módulos del plan del tenant. null = sin plan asignado, es decir, sin
+  // restricción de módulos (el backend lo trata igual, ver ModuloGuard).
+  modulos: Modulo[] | null;
 }
 
 interface LoginResponse {

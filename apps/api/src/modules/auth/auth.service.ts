@@ -28,7 +28,9 @@ export class AuthService {
       where: { id: userId },
       include: {
         roles: { include: { role: { include: { permisos: true } } } },
-        tenant: { select: { estado: true } },
+        tenant: {
+          select: { estado: true, plan: { select: { modulos: true } } },
+        },
       },
     });
   }
@@ -40,7 +42,9 @@ export class AuthService {
       user.roles.flatMap((ur) => ur.role.permisos.map((p) => p.permission)),
     );
     const roleNames = user.roles.map((ur) => ur.role.nombre);
-    return { permissions: [...permissions], roleNames };
+    // Sin plan asignado -> null, que el ModuloGuard lee como "sin restricción".
+    const modulos = user.tenant.plan?.modulos ?? null;
+    return { permissions: [...permissions], roleNames, modulos };
   }
 
   private assertTenantAccesible(estado: EstadoTenant) {
@@ -87,7 +91,9 @@ export class AuthService {
       where: { email: dto.email },
       include: {
         roles: { include: { role: { include: { permisos: true } } } },
-        tenant: { select: { estado: true } },
+        tenant: {
+          select: { estado: true, plan: { select: { modulos: true } } },
+        },
       },
     });
 
@@ -102,13 +108,14 @@ export class AuthService {
 
     this.assertTenantAccesible(user.tenant.estado);
 
-    const { permissions, roleNames } = this.computePermissions(user);
+    const { permissions, roleNames, modulos } = this.computePermissions(user);
 
     const accessToken = this.signAccessToken({
       sub: user.id,
       tenantId: user.tenantId,
       roles: roleNames,
       permissions,
+      modulos,
       puntoCompraId: user.puntoCompraId,
     });
     const refreshToken = await this.issueRefreshToken(user.id);
@@ -128,6 +135,7 @@ export class AuthService {
         tenantId: user.tenantId,
         roles: roleNames,
         permissions,
+        modulos,
       },
     };
   }
@@ -157,12 +165,13 @@ export class AuthService {
       data: { revokedAt: new Date() },
     });
 
-    const { permissions, roleNames } = this.computePermissions(user);
+    const { permissions, roleNames, modulos } = this.computePermissions(user);
     const accessToken = this.signAccessToken({
       sub: user.id,
       tenantId: user.tenantId,
       roles: roleNames,
       permissions,
+      modulos,
       puntoCompraId: user.puntoCompraId,
     });
     const refreshToken = await this.issueRefreshToken(user.id);

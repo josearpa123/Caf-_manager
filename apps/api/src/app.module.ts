@@ -7,6 +7,7 @@ import configuration from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuditModule } from './common/audit/audit.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { ModuloGuard } from './common/guards/modulo.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { PlatformModule } from './modules/platform/platform.module';
 import { RegistroModule } from './modules/registro/registro.module';
@@ -51,6 +52,9 @@ import { ReportesModule } from './modules/reportes/reportes.module';
     // Orden importa: JwtAuthGuard debe correr antes que PermissionsGuard
     // para poblar request.user (del que PermissionsGuard depende).
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // El módulo se valida antes que el permiso: si el plan no lo incluye, da
+    // igual qué permisos tenga el usuario.
+    { provide: APP_GUARD, useClass: ModuloGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
 })

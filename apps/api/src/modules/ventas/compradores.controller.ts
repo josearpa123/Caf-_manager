@@ -1,12 +1,14 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
-import { Permission } from '@prisma/client';
+import { Modulo, Permission } from '@prisma/client';
 import { CompradoresService } from './compradores.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { RequireModulo } from '../../common/decorators/require-modulo.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateCompradorDto } from './dto/create-comprador.dto';
 import { UpdateCompradorDto } from './dto/update-comprador.dto';
 
 @Controller('compradores')
+@RequireModulo(Modulo.VENTAS)
 export class CompradoresController {
   constructor(private readonly compradoresService: CompradoresService) {}
 

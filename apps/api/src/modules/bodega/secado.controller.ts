@@ -7,15 +7,17 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { Permission } from '@prisma/client';
+import { Modulo, Permission } from '@prisma/client';
 import { SecadoService } from './secado.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { RequireModulo } from '../../common/decorators/require-modulo.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateProcesoSecadoDto } from './dto/create-proceso-secado.dto';
 import { FinalizarProcesoSecadoDto } from './dto/finalizar-proceso-secado.dto';
 import { QueryPuntoCompraDto } from './dto/query-punto-compra.dto';
 
 @Controller('bodega/secado')
+@RequireModulo(Modulo.BODEGA)
 export class SecadoController {
   constructor(private readonly secadoService: SecadoService) {}
 

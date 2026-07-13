@@ -11,10 +11,19 @@ export class RegistroService {
   constructor(private readonly prisma: PrismaService) {}
 
   // Catálogo de planes para la página pública: solo lo necesario para
-  // mostrar precios/límites, sin exponer nada interno.
+  // mostrar precios/límites, sin exponer nada interno. Se ocultan los planes
+  // sin módulos: son planes a medio armar y no se pueden asignar a nadie.
   listPlanes() {
     return this.prisma.plan.findMany({
-      select: { id: true, nombre: true, maxUsuarios: true, maxPuntosCompra: true },
+      where: { modulos: { isEmpty: false } },
+      select: {
+        id: true,
+        nombre: true,
+        precioMensual: true,
+        maxUsuarios: true,
+        maxPuntosCompra: true,
+        modulos: true,
+      },
       orderBy: { maxUsuarios: 'asc' },
     });
   }
@@ -27,7 +36,11 @@ export class RegistroService {
   async registrar(dto: RegistrarTenantDto) {
     if (dto.planId) {
       const plan = await this.prisma.plan.findUnique({ where: { id: dto.planId } });
-      if (!plan) throw new NotFoundException('El plan seleccionado no existe');
+      // Un plan sin módulos no se ofrece en la landing y tampoco se acepta si
+      // llega por id: dejaría al tenant sin nada que usar (ver ModuloGuard).
+      if (!plan || plan.modulos.length === 0) {
+        throw new NotFoundException('El plan seleccionado no existe');
+      }
     }
 
     const existente = await this.prisma.user.findUnique({

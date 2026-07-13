@@ -1,12 +1,14 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { Permission } from '@prisma/client';
+import { Modulo, Permission } from '@prisma/client';
 import { ConciliacionesService } from './conciliaciones.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { RequireModulo } from '../../common/decorators/require-modulo.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateConciliacionDto } from './dto/create-conciliacion.dto';
 import { QueryConciliacionesDto } from './dto/query-conciliaciones.dto';
 
 @Controller('conciliaciones')
+@RequireModulo(Modulo.PAGOS)
 export class ConciliacionesController {
   constructor(private readonly conciliacionesService: ConciliacionesService) {}
 

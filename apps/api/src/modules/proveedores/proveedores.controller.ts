@@ -8,15 +8,17 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { Permission } from '@prisma/client';
+import { Modulo, Permission } from '@prisma/client';
 import { ProveedoresService } from './proveedores.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { RequireModulo } from '../../common/decorators/require-modulo.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateProveedorDto } from './dto/create-proveedor.dto';
 import { UpdateProveedorDto } from './dto/update-proveedor.dto';
 import { QueryProveedoresDto } from './dto/query-proveedores.dto';
 
 @Controller('proveedores')
+@RequireModulo(Modulo.PROVEEDORES)
 export class ProveedoresController {
   constructor(private readonly proveedoresService: ProveedoresService) {}
 

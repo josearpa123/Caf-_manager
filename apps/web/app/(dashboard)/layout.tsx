@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   BarChart3,
   Coffee,
@@ -15,19 +15,23 @@ import {
   Wallet,
   Warehouse,
 } from 'lucide-react';
+import { Modulo } from '@coffee-manager/shared-types';
 import { useAuth } from '@/lib/auth';
 import { AppShell, type AppShellNavItem } from '@/components/shell/app-shell';
+import { ModuloBloqueado } from '@/components/shell/modulo-bloqueado';
 
-const navItems: AppShellNavItem[] = [
-  { href: '/proveedores', label: 'Proveedores', icon: Users },
-  { href: '/recepcion', label: 'Recepción', icon: PackageCheck },
-  { href: '/bodega', label: 'Bodega', icon: Warehouse },
-  { href: '/ventas', label: 'Ventas', icon: ShoppingCart },
-  { href: '/cortes', label: 'Cortes', icon: Truck },
-  { href: '/pagos', label: 'Pagos', icon: Wallet },
-  { href: '/prestamos', label: 'Préstamos', icon: HandCoins },
-  { href: '/facturacion', label: 'Facturación', icon: FileText },
-  { href: '/reportes', label: 'Reportes', icon: BarChart3, exact: true },
+// Un ítem sin `modulo` no se puede excluir de un plan: la administración del
+// propio tenant va siempre incluida.
+const navItems: (AppShellNavItem & { modulo?: Modulo })[] = [
+  { href: '/proveedores', label: 'Proveedores', icon: Users, modulo: Modulo.PROVEEDORES },
+  { href: '/recepcion', label: 'Recepción', icon: PackageCheck, modulo: Modulo.RECEPCION },
+  { href: '/bodega', label: 'Bodega', icon: Warehouse, modulo: Modulo.BODEGA },
+  { href: '/ventas', label: 'Ventas', icon: ShoppingCart, modulo: Modulo.VENTAS },
+  { href: '/cortes', label: 'Cortes', icon: Truck, modulo: Modulo.CORTES },
+  { href: '/pagos', label: 'Pagos', icon: Wallet, modulo: Modulo.PAGOS },
+  { href: '/prestamos', label: 'Préstamos', icon: HandCoins, modulo: Modulo.PRESTAMOS },
+  { href: '/facturacion', label: 'Facturación', icon: FileText, modulo: Modulo.FACTURACION },
+  { href: '/reportes', label: 'Reportes', icon: BarChart3, exact: true, modulo: Modulo.REPORTES },
   { href: '/configuracion', label: 'Configuración', icon: Settings },
 ];
 
@@ -38,6 +42,7 @@ export default function DashboardLayout({
 }) {
   const { user, isLoading, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -53,15 +58,36 @@ export default function DashboardLayout({
     );
   }
 
+  // Ocultar del menú lo que el plan no incluye. Sin plan (null) se muestra
+  // todo. El bloqueo de verdad lo hace el ModuloGuard en la API; esto es para
+  // que el tenant no vea puertas que no puede abrir.
+  const modulos = user.modulos;
+  const navVisible = modulos
+    ? navItems.filter((item) => !item.modulo || modulos.includes(item.modulo))
+    : navItems;
+
+  // Al menú no se llega, pero a la URL sí (un link guardado, el historial).
+  // Si la ruta pertenece a un módulo fuera del plan, mostramos la explicación
+  // en vez de la página: sus peticiones darían 403 y se vería vacía.
+  const moduloDeLaRuta = navItems.find(
+    (item) => item.modulo && (pathname === item.href || pathname.startsWith(`${item.href}/`)),
+  )?.modulo;
+  const bloqueado =
+    modulos && moduloDeLaRuta && !modulos.includes(moduloDeLaRuta) ? moduloDeLaRuta : null;
+
   return (
     <AppShell
       brandIcon={Coffee}
       brandLabel="Coffee Manager"
-      navItems={navItems}
+      navItems={navVisible}
       userName={user.nombre}
       onLogout={logout}
     >
-      {children}
+      {bloqueado ? (
+        <ModuloBloqueado modulo={bloqueado} volverHref={navVisible[0]?.href ?? '/configuracion'} />
+      ) : (
+        children
+      )}
     </AppShell>
   );
 }

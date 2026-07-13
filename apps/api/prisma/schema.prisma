@@ -95,6 +95,26 @@ enum Permission {
   AUDITORIA_VER
 }
 
+// Módulos comercializables: la unidad con la que la plataforma arma un Plan.
+// Un Permission dice qué puede hacer un usuario DENTRO del tenant; un Modulo
+// dice qué le vendimos al tenant. Son ejes distintos y se validan por
+// separado (ModuloGuard corre antes que PermissionsGuard).
+//
+// La administración del propio tenant (usuarios, roles, puntos de compra,
+// configuración de empresa) no es un módulo a propósito: dejarla fuera de un
+// plan dejaría al tenant sin forma de gestionarse, así que siempre va incluida.
+enum Modulo {
+  PROVEEDORES
+  RECEPCION // incluye análisis de calidad y tabla de precios
+  BODEGA // incluye secado, trilla y ajustes de inventario
+  VENTAS // incluye compradores y contratos de venta
+  CORTES // viajes/cortes de café
+  PAGOS // incluye anticipos y conciliaciones
+  PRESTAMOS
+  FACTURACION
+  REPORTES
+}
+
 // Tipos de café que efectivamente se COMPRAN en recepción.
 // MOJADO: café recién despulpado y lavado, aún húmedo — se compra a precio
 // directo negociado (no se le mide humedad, no tiene sentido en ese estado).
@@ -199,11 +219,15 @@ model PlatformAdmin {
 // Plan asignado por el super-admin de plataforma a cada tenant: define
 // límites de uso (no es un sistema de facturación, solo control de acceso).
 // null en los límites = sin tope.
+// Un Tenant sin plan asignado no tiene límites ni restricción de módulos: es
+// el estado en el que nace una cuenta antes de que la plataforma le defina uno.
 model Plan {
   id              String   @id @default(cuid())
   nombre          String   @unique
+  precioMensual   Int? // COP/mes. null = "a convenir", no se muestra precio.
   maxUsuarios     Int
   maxPuntosCompra Int?
+  modulos         Modulo[]
   createdAt       DateTime @default(now())
 
   tenants Tenant[]
