@@ -59,7 +59,7 @@ export default function NuevaRecepcionPage() {
 
   const factorCalculado =
     modoFactor === 'CALCULADO' && pesoMuestraKg && pesoAlmendraMuestraKg
-      ? ((Number(pesoAlmendraMuestraKg) / Number(pesoMuestraKg)) * 100).toFixed(2)
+      ? ((Number(pesoMuestraKg) / Number(pesoAlmendraMuestraKg)) * 70).toFixed(2)
       : null;
 
   const agregarDefecto = () => {

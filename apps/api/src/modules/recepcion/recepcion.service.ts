@@ -17,6 +17,10 @@ import { TablaPreciosService } from './tabla-precios.service';
 import { CreateRecepcionDto } from './dto/create-recepcion.dto';
 import { QueryRecepcionesDto } from './dto/query-recepciones.dto';
 
+// Factor de rendimiento en convención FNC: kg de café pergamino necesarios
+// para producir una carga de 70 kg de almendra. Menor factor = mejor café.
+const KG_ALMENDRA_POR_CARGA = 70;
+
 const RECEPCION_DETAIL_INCLUDE = {
   proveedor: {
     select: {
@@ -119,7 +123,9 @@ export class RecepcionService {
       }
       return (
         Math.round(
-          (analisis.pesoAlmendraMuestraKg / analisis.pesoMuestraKg) * 100 * 100,
+          (analisis.pesoMuestraKg / analisis.pesoAlmendraMuestraKg) *
+            KG_ALMENDRA_POR_CARGA *
+            100,
         ) / 100
       );
     }
