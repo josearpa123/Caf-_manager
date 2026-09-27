@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -7,7 +8,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { Permission } from '@prisma/client';
+import { Permission, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PlatformJwtPayload } from '../../common/types/auth.types';
 import { PlatformLoginDto } from './dto/platform-login.dto';
@@ -138,48 +139,68 @@ export class PlatformService {
       await this.assertPlanAsignable(dto.planId);
     }
 
+    // El email de User es único a nivel global (no por tenant): revisamos
+    // antes para dar un mensaje claro, igual que /registro.
+    const existente = await this.prisma.user.findUnique({
+      where: { email: dto.adminEmail },
+      select: { id: true },
+    });
+    if (existente) {
+      throw new ConflictException('Ese correo ya está en uso por otro usuario');
+    }
+
     const passwordHash = await bcrypt.hash(dto.adminPassword, 10);
 
-    const { tenant, admin } = await this.prisma.$transaction(async (tx) => {
-      const tenant = await tx.tenant.create({
-        data: { nombre: dto.nombreTenant, nit: dto.nit, planId: dto.planId },
+    try {
+      const { tenant, admin } = await this.prisma.$transaction(async (tx) => {
+        const tenant = await tx.tenant.create({
+          data: { nombre: dto.nombreTenant, nit: dto.nit, planId: dto.planId },
+        });
+
+        const role = await tx.role.create({
+          data: {
+            tenantId: tenant.id,
+            nombre: ADMIN_ROLE_NAME,
+            esSistema: true,
+          },
+        });
+
+        await tx.rolePermission.createMany({
+          data: Object.values(Permission).map((permission) => ({
+            tenantId: tenant.id,
+            roleId: role.id,
+            permission,
+          })),
+        });
+
+        const admin = await tx.user.create({
+          data: {
+            tenantId: tenant.id,
+            email: dto.adminEmail,
+            nombre: dto.adminNombre,
+            passwordHash,
+          },
+        });
+
+        await tx.userRole.create({
+          data: { userId: admin.id, roleId: role.id },
+        });
+
+        return { tenant, admin };
       });
 
-      const role = await tx.role.create({
-        data: {
-          tenantId: tenant.id,
-          nombre: ADMIN_ROLE_NAME,
-          esSistema: true,
-        },
-      });
-
-      await tx.rolePermission.createMany({
-        data: Object.values(Permission).map((permission) => ({
-          tenantId: tenant.id,
-          roleId: role.id,
-          permission,
-        })),
-      });
-
-      const admin = await tx.user.create({
-        data: {
-          tenantId: tenant.id,
-          email: dto.adminEmail,
-          nombre: dto.adminNombre,
-          passwordHash,
-        },
-      });
-
-      await tx.userRole.create({
-        data: { userId: admin.id, roleId: role.id },
-      });
-
-      return { tenant, admin };
-    });
-
-    return {
-      tenant,
-      admin: { id: admin.id, email: admin.email, nombre: admin.nombre },
-    };
+      return {
+        tenant,
+        admin: { id: admin.id, email: admin.email, nombre: admin.nombre },
+      };
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Ese correo ya está en uso por otro usuario');
+      }
+      throw error;
+    }
   }
 }

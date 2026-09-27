@@ -45,5 +45,8 @@ coverage/
 # Docker volumes (si se montan localmente)
 docker/volumes/
 
-# Claude Code local session state
-.claude/
+# Claude Code local session state (settings/hooks/skills SÍ se versionan)
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+!.claude/skills/

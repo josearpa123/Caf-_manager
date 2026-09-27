@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-progreso.sh",
+            "shell": "bash",
+            "timeout": 15,
+            "statusMessage": "Revisando si docs/PROGRESO.md está al día..."
+          }
+        ]
+      }
+    ]
+  }
+}
