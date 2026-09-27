@@ -4,6 +4,22 @@
 
 **Última actualización:** 2026-09-27
 
+## Simulación de un mes de operación en 3 tenants + auditoría de bugs (sesión 2026-09-27, continuación)
+
+Pedido del usuario: simular ~1 mes de actividad real con varios negocios ("clientes") comprando y vendiendo café, encontrar fallos y cosas a mejorar, con foco en que la compra/ingreso de datos sea rápido, y reportar si la data generada ocupa mucho espacio en disco.
+
+- **Script de simulación** (`node` ad-hoc contra la API local, no queda en el repo — vivía en el scratchpad de la sesión): creó 3 tenants (`Cooperativa Los Andes Sim`, `Finca El Mirador Sim`, `Trilladora San Jose Sim`), cada uno con 2 puntos de compra, 8 proveedores, tabla de precios (2 tramos), ~24 recepciones mezclando PERGAMINO/MOJADO/PASILLA, procesos de secado y trilla, anticipos/pagos con los 4 métodos de pago, un préstamo con abono parcial, compradores, ventas (incluida una entrega parcial contra un contrato de venta), y casos límite deliberados (proveedor duplicado, anticipo/abono con CREDITO, pago CHEQUE sin número, venta que excede stock, venta con lotes que no cuadran, recepción PERGAMINO fuera de cualquier tramo de precio, tenant con email de admin repetido). Total 233 llamadas API.
+- **Resultado de los casos límite**: todos devuelven 4xx con mensaje claro (verificado también a mano con curl, no solo confiando en el script) — nada de 500 en las validaciones de negocio ya existentes.
+- **Bug encontrado y arreglado — mismo patrón en un segundo lugar**: `UsersService.create()` (`apps/api/src/modules/users/users.service.ts`, usado por `POST /users` para agregar usuarios dentro de un tenant) tenía el mismo problema que se arregló hoy en `PlatformService.createTenant` — `User.email` es único global y no se capturaba el conflicto. Arreglado con el mismo patrón (chequeo previo + catch de `P2002` → 409 `Ese correo ya está en uso por otro usuario`). Verificado con curl: usuario con el email del admin de otro tenant → 409 en vez de 500. **No se auditó ningún otro punto del código que haga `tx.user.create()`** más allá de estos dos (`createTenant` y `RegistroService`, que ya lo manejaba bien) — si aparece un tercero, es la misma causa.
+- **Velocidad**: a nivel de API, excelente — latencia promedio 20ms por llamada, 21ms para un `POST /recepcion` (una compra) sobre 72 muestras, ninguna llamada superó 500ms. La velocidad real de captura en campo depende del formulario del frontend (clics/campos), que no se pudo medir porque la extensión de Claude in Chrome no está conectada en este equipo — evaluación pendiente de una sesión con navegador disponible.
+- **Espacio en disco**: la base de datos local completa pesa **11 MB** y el volumen de Docker `docker_postgres_data` **68.59 MB** — la simulación no representa un problema de espacio ni de lejos. (De paso, se encontraron otros volúmenes Docker de proyectos no relacionados ocupando varios GB en la misma máquina — no se tocaron, es información aparte para el usuario, no de este proyecto.)
+- Los 3 tenants de simulación (`estado: PRUEBA`) quedaron en la base local junto con los datos preexistentes de julio 2026 (`Finca Demo`, `Finca El Roble`, `Cooperativa La Esperanza`, etc.) — no se borraron porque el espacio es insignificante; limpiarlos requeriría un script de borrado en cascada (no existe `DELETE` de tenant en la API a propósito) que no se justificó construir dado lo poco que pesan.
+
+### Pendiente / fuera de alcance
+- Evaluar la velocidad real de captura de datos en el frontend (clics, tabs, campos por formulario) — necesita sesión con extensión de navegador conectada.
+- Auditar el resto del código en busca de más `tx.user.create()` o patrones equivalentes con constraints únicos sin capturar (solo se encontraron y arreglaron los 2 casos que se reprodujeron).
+- Limpieza de los 3 tenants de simulación en la base local, si en algún momento se quiere una base "limpia" para demos (hoy no es necesario, el espacio es mínimo).
+
 ## Setup de entorno local + hook y skill de documentación automática (sesión 2026-09-27)
 
 Pedido del usuario: levantar el proyecto en local (nunca se había corrido en esta máquina) y recuperar/resetear credenciales de acceso, tanto locales como de producción. De paso, pidió una skill + hook que documente automáticamente el trabajo en esta bitácora para no depender de que alguien se acuerde de hacerlo a mano.
