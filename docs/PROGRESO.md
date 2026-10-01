@@ -4,6 +4,16 @@
 
 **Última actualización:** 2026-09-30
 
+## CI: arreglo de pnpm tras el primer run real en GitHub (sesión 2026-10-01)
+
+Primer run real del CI en el PR #1 (`ci/cobertura-y-lint`): `lint-build-test` falló en 15 s en `pnpm/action-setup@v4` con "Multiple versions of pnpm specified" — el workflow fijaba `version: 11` y `package.json` ya declara `packageManager: pnpm@11.10.0`. **Fallo preexistente** (el mismo bloque venía en `main`), no causado por los cambios del PR, pero impedía que corriera cualquier paso.
+
+- **Fix**: se quitó `with: version: 11` en `.github/workflows/ci.yml`; la versión sale de `packageManager`. `next lint` de la web pasa limpio en local. Los pasos posteriores (lint/build/test, `test:cov`, `migrate deploy`, `migrate diff`, `test:int`) siguen **sin verificarse en GitHub**: es probable que aparezcan fallos nuevos en el siguiente run.
+- **GitGuardian**: sigue marcando el commit `141cef7` (la URL `postgres:postgres@…/shadow` de la contraseña desechable del job). El fix posterior (`9c93837`) no lo limpia del historial del PR. Solución sugerida: marcarlo como falso positivo en el panel de GitGuardian; reescribir historial queda descartado salvo que el usuario lo pida.
+
+### Pendiente / fuera de alcance
+- Push de la rama y revisar el siguiente run del CI.
+
 ## CI sin credenciales literales tras alerta de GitGuardian (sesión 2026-09-30)
 
 Al abrir el PR de `ci/cobertura-y-lint`, el bot GitGuardian marcó 1 secreto. Era falso positivo: la URL `postgres:postgres@localhost…/shadow` que se había agregado al paso "El schema coincide con las migraciones" de `.github/workflows/ci.yml` (contraseña desechable del servicio postgres del job; la de `apps/api/.env` local también es `postgres`, pero ese archivo no está versionado). Se comprobó que ni esa contraseña ni los dos secretos JWT locales aparecen en el historial de las ramas más allá de ese literal genérico.
