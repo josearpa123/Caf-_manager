@@ -390,12 +390,16 @@ Para crear el primer tenant de prueba: entrar a `/platform/login` con `PLATFORM_
 
 ## Cómo retomar en la próxima sesión
 
-1. Leer este archivo.
-2. Si hay dudas de diseño, revisar `docs/requerimientos.md`.
-3. **Los 8 módulos de negocio del MVP original ya están implementados** (backend + frontend). No hay "siguiente módulo" obvio; las opciones para la próxima sesión son:
-   - **Conectar un proveedor real de facturación** (Factus o Siigo) el día que el usuario decida cuál — implementar `FacturacionProviderAdapter` en `src/modules/facturacion/adapters/`, registrarlo en `FacturacionModule` y en el `switch` de `facturacion-provider.factory.ts`. Probablemente también haga falta el CRUD de `ResolucionFacturacion` en ese momento (rango de numeración DIAN, hoy no existe).
-   - **QA visual en navegador real** — nunca se ha hecho en ninguna sesión (sin herramienta de automatización disponible en este entorno). Repasar cada módulo a mano sería el mayor salto de confianza posible en este punto.
-   - **Rentabilidad por lote** en Reportes (ver nota en "Pendiente" de esa sección) — cruzar `VentaLoteOrigen` con `Recepcion.valorTotal`.
-   - Cualquiera de las mejoras menores listadas en las secciones "Pendiente" de cada módulo (edición de recepciones, PDF de recibo, filtros de fecha en listados de Pagos, etc.) — ninguna es bloqueante, son pulido.
-   - O lo que el usuario pida directamente; a estas alturas el sistema es funcional de punta a punta (compra → bodega → venta → pago → reporte), así que el trabajo que sigue es más sobre necesidades reales del negocio que sobre huecos del MVP.
-4. Al terminar una sesión de trabajo, actualizar este archivo.
+**Estado (2026-09-30): ejecutando el plan de `docs/TECNICO.md`. Sprint 0 casi cerrado.** Leer `CLAUDE.md` (reglas de dominio y de trabajo), la sección del sprint en `docs/TECNICO.md` y las 4 entradas "Sprint 0 · PR n" de arriba.
+
+1. **Ramas locales encadenadas, sin push ni PR** (cada una parte de la anterior): `test/dominio-calidad-recepcion` → `feat/consecutivos-atomicos` → `test/dominio-pagos` → `ci/cobertura-y-lint` (la última contiene todo). `main` no se tocó. Decidir con el usuario cómo subirlas (¿un PR por rama encadenados, o uno solo?).
+2. **Entorno de pruebas**: PostgreSQL en el contenedor `docker-postgres-1` dentro de WSL Ubuntu (puerto 5432, visible desde Windows). WSL se apaga sola y reinicia los contenedores: antes de probar, iniciar `wsl -e sleep infinity` en segundo plano y `wsl -e docker start docker-postgres-1`. BD de pruebas `coffee_manager_test` (con las migraciones aplicadas); integración: `DATABASE_URL=…/coffee_manager_test pnpm --filter api test:int`. Unitarias: `pnpm --filter api test:cov`. No correr `pnpm lint` suelto: usa `--fix` y reescribe archivos ajenos (usar `npx eslint … --no-fix`).
+3. **Falta del Sprint 0**: PR 5 Sentry (esperando aprobación de dependencias `@sentry/nestjs` y `@sentry/nextjs` + DSN) y que el usuario active la protección de `main` en GitHub.
+4. **Decisiones por confirmar con el usuario**: huecos en la numeración (consecutivo asignado antes de la transacción, ADR-003); orden/forma de los PRs.
+5. **Deuda técnica registrada** (ver entradas del Sprint 0): auditoría no transaccional (`audit-log.extension.ts`, riesgo de bloqueo del pool y auditoría de transacciones revertidas — arreglar pronto), carrera en `ConciliacionesService` (sobre-aplicar anticipos), plata con `number` en vez de `Decimal`, `estadoCuenta` en memoria.
+6. **Siguiente**: Sprint 1 (recepción rápida: `idempotencyKey`, `numeroSacos`, `Proveedor.apodo`, `pg_trgm`, pantalla nueva, 45 s). Parte con una migración expandir; no tocar `.env`.
+
+### Referencias antiguas (MVP original)
+1. Si hay dudas de diseño, revisar `docs/requerimientos.md`.
+2. Los 8 módulos de negocio del MVP original ya están implementados (backend + frontend). Opciones fuera del plan: proveedor real de facturación (Factus/Siigo vía `FacturacionProviderAdapter`), QA visual en navegador (nunca hecho), rentabilidad por lote en Reportes, pulido menor de módulos.
+3. Al terminar una sesión de trabajo, actualizar este archivo.
