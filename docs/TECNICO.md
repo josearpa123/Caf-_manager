@@ -57,6 +57,13 @@ Los diagramas de este documento son la versión para leer. El anexo trae los mis
 | 3 · Infraestructura | 12–25 nov | Hostinger KVM 2 + Coolify; backups diarios de PostgreSQL fuera del servidor y restauración probada; Redis + BullMQ para PDFs y mensajes; límites de peticiones, cabeceras de seguridad, monitoreo de disponibilidad; autorización de datos en el registro del proveedor | H6 | Restauración completa en < 1 h desde el backup de ayer |
 | 4 · Pilotos y onboarding | 26 nov–9 dic | Importación de proveedores y saldos iniciales desde Excel; asistente de configuración inicial; corrección de lo que reporten los pilotos | — | 3 pilotos registrando todas sus compras del día en el sistema |
 
+**Estado de avance (actualizar con cada PR):**
+
+| Sprint | Estado | Detalle |
+| --- | --- | --- |
+| 0 · Bases | En curso | PR 1 hecho (pruebas de dominio de recepción, H2 parcial). Pendiente: consecutivos atómicos (H1), pruebas de `pagos`, CI con cobertura, Sentry |
+| 1–4 | Pendiente | — |
+
 **Fase 2 (enero–marzo de 2027), solo si pasa el punto de decisión del 5 de enero:** documento soporte electrónico con un proveedor tecnológico (H8), modo sin conexión (PWA con cola local), cobro de la suscripción y suspensión por mora dentro de la plataforma.
 
 **Fase 3 (abril–junio de 2027):** fincas por proveedor y trazabilidad lote → fincas para EUDR, lectura directa de la báscula desde el navegador, estado de cuenta del caficultor por WhatsApp.

@@ -2,7 +2,38 @@
 
 > Este archivo se actualiza al final de cada sesión de trabajo relevante. Es lo primero que hay que leer al retomar el proyecto (junto con `docs/requerimientos.md` para decisiones de diseño ya tomadas).
 
-**Última actualización:** 2026-09-27
+**Última actualización:** 2026-09-30
+
+## Sprint 0 · PR 1 — pruebas unitarias de dominio de recepción (sesión 2026-09-30)
+
+Pedido del usuario: ejecutar todo el plan de `docs/TECNICO.md`, un PR a la vez con pruebas primero. Rama `test/dominio-calidad-recepcion` (2 commits locales, sin push ni PR abierto).
+
+- **Cubre**: H2, RNF-07 (parcial). Reglas de dominio 2–3 documentadas pero aún no implementadas (llegan en sprints 1–2).
+- **Pruebas agregadas** (`apps/api/src/modules/recepcion/`): `recepcion.service.spec.ts` y `tabla-precios.service.spec.ts` — 42 pruebas con Prisma simulado: peso neto (redondeo, rechazo ≤ 0), factor de rendimiento (CALCULADO/MANUAL, validaciones), tramo de precio (prioridad punto sobre general, sin tramo → 400), valor total, MOJADO/PASILLA con precio directo, movimiento de inventario, análisis y defectos, código `REC-año-NNNNNN`, traducción de P2003, validaciones de proveedor/punto. Cobertura: `recepcion.service.ts` 100% líneas / 94% ramas; `tabla-precios.service.ts` 100%.
+- **Sin cambios de código de producción.** Son pruebas de caracterización: fijan el comportamiento actual antes de refactorizar en el PR 2.
+- **Hallazgos de paso** (no corregidos aquí):
+  - El módulo `calidad` solo sirve el catálogo de defectos; la lógica de calidad (factor, tramo) vive en `recepcion/`. La meta de ≥ 90% en `calidad` es trivial; la real está en `recepcion`.
+  - El cálculo de plata usa `number` + `Math.round` (peso neto, valor total), no `Decimal` — contradice la regla de dominio 1. Migrar a `Prisma.Decimal` queda pendiente (propuesto como PR aparte).
+  - `pnpm lint` corre con `--fix` y reescribe archivos no relacionados (19 en esta sesión; se revirtieron). Además hay ~40 errores de lint preexistentes en `main.ts`, `ninguno.provider.ts`, `query-viajes.dto.ts` y otros: CI (`pnpm lint`) probablemente ya fallaba antes. Pendiente decidir si se arreglan o se ajusta la regla.
+  - No hay Docker ni PostgreSQL local en esta máquina: las pruebas de integración con base real (PR 2) correrán en CI (que tiene servicio postgres) y no se pueden ejecutar localmente sin instalar uno.
+- Los documentos del plan (`CLAUDE.md`, `docs/TECNICO.md`, `docs/adr/`, `docs/diagramas/`) entran en el primer commit de esta rama.
+
+### Pendiente / fuera de alcance
+- PR 2 (consecutivos atómicos), PR 3 (pruebas de `pagos`), PR 4 (CI con cobertura), PR 5 (Sentry).
+
+## Arranca el plan técnico v1.0: documentación y ADR (sesión 2026-09-30)
+
+Pedido del usuario: incorporar la documentación técnica y plan de desarrollo v1.0 al repo (sin tocar código). Los archivos llegaron como `CLAUDE (1).md` y `Coffee Manager — Documentación técnica y plan de desarrollo.md`; el usuario autorizó renombrarlos.
+
+- **Docs**: `CLAUDE.md` (raíz, instrucciones permanentes con reglas de dominio y actualización obligatoria de docs) y `docs/TECNICO.md` (RF/RNF, casos de uso CU-01..03, modelo de datos, arquitectura, escalabilidad, sprints 0–4, hallazgos H1–H8).
+- **Diagramas** (copiados tal cual del anexo de TECNICO.md): `docs/diagramas/mer.md` (MER de 37 tablas: 34 actuales + `Consecutivo`, `ParametroTributario`, `Finca` propuestas) y `docs/diagramas/secuencia-recepcion.md`.
+- **ADR** en `docs/adr/`: `001-monolito-modular`, `002-multitenant-base-compartida`, `003-consecutivos-por-contador`, `004-recepciones-inmutables`, `005-trabajos-externos-por-cola`, `006-hostinger-coolify` (contexto, decisión, consecuencias; redactados a partir de TECNICO.md, que solo da el título de cada uno).
+- Sin cambios de código, schema ni infraestructura.
+
+### Pendiente / fuera de alcance
+- Sprint 0 (consecutivos atómicos H1, pruebas de dominio H2, CI, Sentry) es el siguiente paso; aún no iniciado.
+- Los ADR son borradores derivados del documento: revisar que reflejen lo que el usuario realmente decidió (p. ej. ADR-006).
+- El MER fue copiado del anexo, no regenerado desde `schema.prisma`; regenerar al cambiar el schema.
 
 ## Simulación de un mes de operación en 3 tenants + auditoría de bugs (sesión 2026-09-27, continuación)
 
