@@ -36,7 +36,7 @@ Los diagramas de este documento son la versión para leer. El anexo trae los mis
 
 | # | Hallazgo | Dónde | Riesgo | Corrección |
 | --- | --- | --- | --- | --- |
-| H1 | El código de recepción (`REC-2026-000123`) se genera con `count()` + 1 | `recepcion.service.ts` | Dos recepciones simultáneas en el mismo tenant obtienen el mismo código y una falla con error 500. Además `count()` se vuelve más lento a medida que crece la tabla | Tabla de consecutivos por tenant y tipo con `UPDATE … RETURNING` atómico (sprint 0) |
+| H1 ✅ | El código de recepción (`REC-2026-000123`) se genera con `count()` + 1 | `recepcion.service.ts` | Dos recepciones simultáneas en el mismo tenant obtienen el mismo código y una falla con error 500. Además `count()` se vuelve más lento a medida que crece la tabla | Tabla de consecutivos por tenant y tipo con `UPDATE … RETURNING` atómico (sprint 0) |
 | H2 | Solo existe la prueba e2e de ejemplo; no hay pruebas de los cálculos | `apps/api/test` | Un cambio en el factor o el precio puede romper la plata de los clientes sin que nadie lo note | Pruebas unitarias del dominio con meta de cobertura (sprint 0) |
 | H3 | El formulario de recepción pide 9+ campos sin valores por defecto | `recepcion/nueva/page.tsx` | No se cumple la meta de 45 segundos; el usuario vuelve al cuaderno | Recepción rápida (sprint 1) |
 | H4 | No hay anulación de recepciones ni campo de estado | modelo `Recepcion` | Los errores de digitación se quedan para siempre o se borran sin rastro | Estado + anulación con movimiento compensatorio (sprint 2) |
@@ -61,7 +61,7 @@ Los diagramas de este documento son la versión para leer. El anexo trae los mis
 
 | Sprint | Estado | Detalle |
 | --- | --- | --- |
-| 0 · Bases | En curso | PR 1 hecho (pruebas de dominio de recepción, H2 parcial). Pendiente: consecutivos atómicos (H1), pruebas de `pagos`, CI con cobertura, Sentry |
+| 0 · Bases | En curso | PR 1 hecho (pruebas de dominio de recepción, H2 parcial). PR 2 hecho: consecutivos atómicos en los 7 servicios (**H1 cerrado**). Pendiente: pruebas de `pagos`, CI con cobertura, Sentry |
 | 1–4 | Pendiente | — |
 
 **Fase 2 (enero–marzo de 2027), solo si pasa el punto de decisión del 5 de enero:** documento soporte electrónico con un proveedor tecnológico (H8), modo sin conexión (PWA con cola local), cobro de la suscripción y suspensión por mora dentro de la plataforma.
@@ -204,8 +204,8 @@ El administrador puede hacer todo lo del operador. "Registrar recepción rápida
 
 | Tabla | Campo | Tipo | Regla | Sprint |
 | --- | --- | --- | --- | --- |
-| `Consecutivo` (nueva) | `tenantId`, `tipo` | `String`, enum (`RECEPCION`, `VENTA`, `PRESTAMO`, …) | Llave primaria compuesta | 0 |
-| `Consecutivo` | `prefijo`, `anio`, `valorActual` | `String`, `Int`, `Int` | Se incrementa con `UPDATE … SET valorActual = valorActual + 1 RETURNING` dentro de la transacción | 0 |
+| `Consecutivo` (nueva, hecha) | `tenantId`, `tipo`, `anio` | `String`, enum (`RECEPCION`, `SECADO`, `TRILLA`, `PRESTAMO`, `VENTA`, `CONTRATO_VENTA`, `VIAJE`), `Int` | Llave primaria compuesta; el año en la llave evita reinicios al registrar fechas de otro año | 0 |
+| `Consecutivo` | `prefijo`, `valorActual` | `String`, `Int` | Se incrementa con `INSERT … ON CONFLICT DO UPDATE … RETURNING` atómico, justo antes de la transacción de negocio (ver ADR-003) | 0 |
 | `Recepcion` | `idempotencyKey` | `String?` | Único por `(tenantId, idempotencyKey)`; lo genera el cliente (UUID) | 1 |
 | `Recepcion` | `numeroSacos` | `Int?` | Tara = sacos × `ConfiguracionTenant.taraPorSacoKg` | 1 |
 | `Proveedor` | `apodo` | `String?` | Buscable; índice de trigramas (`pg_trgm`) sobre nombre, apodo y cédula | 1 |

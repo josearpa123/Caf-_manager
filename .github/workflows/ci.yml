@@ -52,3 +52,9 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Aplicar migraciones
+        run: pnpm --filter api exec prisma migrate deploy
+
+      - name: Pruebas de integración (PostgreSQL real)
+        run: pnpm --filter api test:int

@@ -14,7 +14,6 @@ import { CreateRecepcionDto } from './dto/create-recepcion.dto';
 function buildTx() {
   return {
     recepcion: {
-      count: jest.fn().mockResolvedValue(0),
       create: jest.fn().mockResolvedValue({ id: 'rec-1' }),
       findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'rec-1' }),
     },
@@ -27,6 +26,7 @@ function buildTx() {
 function buildService() {
   const tx = buildTx();
   const prisma = {
+    $queryRaw: jest.fn().mockResolvedValue([{ valorActual: 1 }]),
     recepcion: { findMany: jest.fn(), findUnique: jest.fn() },
     proveedor: {
       findUnique: jest.fn().mockResolvedValue({ id: 'p1', activo: true }),
@@ -34,7 +34,9 @@ function buildService() {
     puntoCompra: {
       findUnique: jest.fn().mockResolvedValue({ id: 'pc1', activo: true }),
     },
-    $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
+    $transaction: jest.fn((fn: (t: typeof tx) => unknown) =>
+      fn(tx),
+    ) as jest.Mock,
   };
   const tablaPrecios = {
     findMatch: jest.fn().mockResolvedValue({ id: 'tramo-1', precioKg: 20000 }),
@@ -327,11 +329,19 @@ describe('RecepcionService', () => {
       expect(tx.defectoAnalisis.createMany).not.toHaveBeenCalled();
     });
 
-    it('arma el código REC-<año>-<n+1 con 6 dígitos>', async () => {
-      const { service, tx } = buildService();
-      tx.recepcion.count.mockResolvedValue(122);
+    it('toma el código REC-<año>-NNNNNN del contador atómico', async () => {
+      const { service, tx, prisma } = buildService();
+      prisma.$queryRaw.mockResolvedValue([{ valorActual: 123 }]);
       await service.create('t1', 'u1', pergamino());
       expect(dataCreada(tx).codigo).toMatch(/^REC-\d{4}-000123$/);
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it('si falla la validación previa no se consume consecutivo', async () => {
+      const { service, prisma } = buildService();
+      prisma.proveedor.findUnique.mockResolvedValue(null);
+      await expect(service.create('t1', 'u1', pergamino())).rejects.toThrow();
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
 
     it('traduce P2003 (FK inválida) a 400', async () => {

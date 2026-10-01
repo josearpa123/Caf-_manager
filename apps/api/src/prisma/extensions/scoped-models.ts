@@ -35,6 +35,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   'Factura',
   'AuditLog',
   'Notificacion',
+  'Consecutivo',
 ]);
 
 export const READ_OPS = new Set([

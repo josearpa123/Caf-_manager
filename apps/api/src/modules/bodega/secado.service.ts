@@ -9,6 +9,7 @@ import {
   TipoInventario,
   TipoMovimientoInventario,
 } from '@prisma/client';
+import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { CreateProcesoSecadoDto } from './dto/create-proceso-secado.dto';
@@ -106,14 +107,17 @@ export class SecadoService {
     );
     const fechaInicio = new Date();
 
-    return this.prisma.$transaction(async (tx) => {
-      const year = fechaInicio.getUTCFullYear();
-      const prefix = `SEC-${year}-`;
-      const count = await tx.procesoSecado.count({
-        where: { codigo: { startsWith: prefix } },
-      });
-      const codigo = `${prefix}${String(count + 1).padStart(6, '0')}`;
+    // Consecutivo atómico en su propia sentencia (no dentro de la transacción):
+    // la auditoría usa otra conexión, y un candado retenido toda la
+    // transacción agotaría el pool. Puede dejar huecos, nunca duplicados.
+    const codigo = await siguienteConsecutivo(
+      this.prisma,
+      tenantId,
+      'SECADO',
+      fechaInicio,
+    );
 
+    return this.prisma.$transaction(async (tx) => {
       const proceso = await tx.procesoSecado.create({
         data: {
           tenantId,

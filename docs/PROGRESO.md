@@ -4,6 +4,20 @@
 
 **Última actualización:** 2026-09-30
 
+## Sprint 0 · PR 2 — consecutivos atómicos, cierra H1 (sesión 2026-09-30)
+
+Rama `feat/consecutivos-atomicos` (sobre la de PR 1; commits locales, sin push). Base de pruebas: PostgreSQL 16 del contenedor `docker-postgres-1` en WSL (hay que dejar `wsl -e sleep infinity` corriendo o WSL se apaga y reinicia los contenedores), BD `coffee_manager_test`.
+
+- **Schema**: migración `20261001024919_consecutivos_atomicos` — enum `TipoConsecutivo`, tabla `Consecutivo` (PK `tenantId+tipo+anio`, FK a Tenant) y siembra desde el mayor consecutivo existente por tenant/tipo/año. **Aplicada también a la BD de desarrollo `coffee_manager`**: sembró 7 contadores a partir de 65 recepciones y los demás documentos de la simulación (ej. REC-2026 → 20).
+- **Backend**: `apps/api/src/prisma/consecutivo.ts` (`siguienteConsecutivo`, un `INSERT … ON CONFLICT DO UPDATE … RETURNING`); reemplaza `count()+1` en **7 servicios**: recepción, secado, trilla, préstamos, ventas, contratos de venta y viajes. `Consecutivo` agregado a `scoped-models.ts` (regla de dominio 8). Prettier reformateó de paso algunas líneas largas en `ventas.service.ts` y `contratos-venta.service.ts`.
+- **Pruebas**: `apps/api/test/consecutivos.int-spec.ts` + `test/jest-int.json` + script `pnpm --filter api test:int` (13 pruebas con PostgreSQL real: formato, 7 prefijos, independencia por tipo/año/tenant, siembra, 100 llamadas concurrentes sin repetir ni saltar, y 100 recepciones con `RecepcionService` real). Con el código antiguo la prueba de recepciones falla con `Unique constraint failed on (tenantId, codigo)`; con el nuevo pasan 13/13 en ~1,5 s. Unitarias: 44 pasan. CI (`ci.yml`) ahora corre `prisma migrate deploy` y `test:int`.
+- **Decisiones que difieren del plan** (también en ADR-003 y TECNICO.md): (1) el año va en la llave; (2) el consecutivo se asigna **antes** de abrir la transacción, no dentro (puede dejar huecos, nunca duplicados) — dentro de la transacción el candado agotaba el pool porque la auditoría usa otra conexión.
+- **Hallazgo importante, preexistente y sin corregir**: `audit-log.extension.ts` escribe el `AuditLog` con el cliente base, fuera de la transacción. Efectos: (a) cada recepción necesita 2 conexiones a la vez, así que ≥ ~(pool/2) recepciones simultáneas pueden bloquearse hasta el timeout (pool por defecto = CPUs×2+1, p. ej. 5 en un VPS de 2 vCPU); (b) si la transacción se revierte, el registro de auditoría ya quedó escrito. Por eso la prueba de 100 recepciones usa 10 en vuelo con pool de 20. Pendiente: PR "auditoría transaccional" (y/o fijar `connection_limit` en producción).
+
+### Pendiente / fuera de alcance
+- PR 3 (pruebas de `pagos`), PR 4 (CI con cobertura mínima), PR 5 (Sentry — requiere aprobar dependencia).
+- Auditoría transaccional; migrar plata de `number` a `Decimal`; ~40 errores de lint preexistentes.
+
 ## Sprint 0 · PR 1 — pruebas unitarias de dominio de recepción (sesión 2026-09-30)
 
 Pedido del usuario: ejecutar todo el plan de `docs/TECNICO.md`, un PR a la vez con pruebas primero. Rama `test/dominio-calidad-recepcion` (2 commits locales, sin push ni PR abierto).

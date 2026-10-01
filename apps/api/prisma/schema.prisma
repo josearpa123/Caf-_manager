@@ -257,6 +257,7 @@ model Tenant {
   tablasPrecioTramo       TablaPrecioTramo[]
   resolucionesFacturacion ResolucionFacturacion[]
   recepciones             Recepcion[]
+  consecutivos            Consecutivo[]
   procesosSecado          ProcesoSecado[]
   procesosTrilla          TrillaProceso[]
   movimientosInventario   MovimientoInventario[]
@@ -1104,4 +1105,32 @@ model Notificacion {
   puntoCompra PuntoCompra? @relation(fields: [puntoCompraId], references: [id])
 
   @@index([tenantId, userId, leida])
+}
+
+// Contadores atómicos de códigos (REC-2026-000123, etc.), uno por tenant,
+// tipo y año. Se incrementan con un único INSERT … ON CONFLICT DO UPDATE …
+// RETURNING dentro de la transacción de negocio (ver ConsecutivoService);
+// nunca con count() + 1. La llave incluye el año para que registrar un
+// documento con fecha de otro año no reinicie ni repita el contador.
+enum TipoConsecutivo {
+  RECEPCION
+  SECADO
+  TRILLA
+  PRESTAMO
+  VENTA
+  CONTRATO_VENTA
+  VIAJE
+}
+
+model Consecutivo {
+  tenantId    String
+  tipo        TipoConsecutivo
+  anio        Int
+  prefijo     String
+  valorActual Int             @default(0)
+  updatedAt   DateTime        @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@id([tenantId, tipo, anio])
 }
