@@ -4,6 +4,18 @@
 
 **Última actualización:** 2026-09-30
 
+## README renovado con capturas y hoja de ruta (sesión 2026-10-01)
+
+Pedido del usuario: README bien armado con pantallazos y todo lo que se hace y se quiere hacer.
+
+- **`README.md`** reescrito: qué hace hoy cada módulo, capturas, hoja de ruta (sprints 0–4, fases 2–3, fuera de alcance, hallazgos H1–H8 con estado), arquitectura, desarrollo local, pruebas/CI, despliegue, índice de documentación y guía de contribución. Reemplaza el texto de "scaffold inicial" que ya no era cierto.
+- **`docs/img/`**: 12 capturas (login, recepción listado/nueva mojado/nueva pergamino, tabla de precios, proveedores, bodega, ventas, pagos, préstamos, reportes, configuración). Tomadas con Edge headless + `puppeteer-core` desde una carpeta temporal (no se agregó ninguna dependencia al repo; la extensión de Chrome no estaba conectada), sobre el negocio de simulación "Cooperativa Los Andes Sim" de la BD local — datos ficticios. Para ello se fijó una contraseña de demostración a `admin1@cooperativalosandessim.test` en la BD **local** (no se versiona ni se documenta).
+- Aviso de entorno: en esta máquina otro proyecto (tienda de jabones) escucha en `[::1]:3000`, así que `localhost:3000` no es Coffee Manager; las capturas se tomaron con `127.0.0.1:3000`.
+
+### Pendiente / fuera de alcance
+- Las capturas son del estado actual (UI previa al rediseño de recepción rápida del Sprint 1); regenerarlas al terminar cada sprint de UI.
+- Falta una captura del panel de plataforma (super-admin) y de la vista de recepción con datos cargados.
+
 ## CI: arreglo de pnpm tras el primer run real en GitHub (sesión 2026-10-01)
 
 Primer run real del CI en el PR #1 (`ci/cobertura-y-lint`): `lint-build-test` falló en 15 s en `pnpm/action-setup@v4` con "Multiple versions of pnpm specified" — el workflow fijaba `version: 11` y `package.json` ya declara `packageManager: pnpm@11.10.0`. **Fallo preexistente** (el mismo bloque venía en `main`), no causado por los cambios del PR, pero impedía que corriera cualquier paso.
