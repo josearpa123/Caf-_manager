@@ -4,6 +4,16 @@
 
 **Última actualización:** 2026-09-30
 
+## CI sin credenciales literales tras alerta de GitGuardian (sesión 2026-09-30)
+
+Al abrir el PR de `ci/cobertura-y-lint`, el bot GitGuardian marcó 1 secreto. Era falso positivo: la URL `postgres:postgres@localhost…/shadow` que se había agregado al paso "El schema coincide con las migraciones" de `.github/workflows/ci.yml` (contraseña desechable del servicio postgres del job; la de `apps/api/.env` local también es `postgres`, pero ese archivo no está versionado). Se comprobó que ni esa contraseña ni los dos secretos JWT locales aparecen en el historial de las ramas más allá de ese literal genérico.
+
+- **Fix** (commit `9c93837`): el paso usa el `DATABASE_URL` del job — `psql "${DATABASE_URL%%\?*}"` (libpq no acepta `?schema=`) y `--shadow-database-url "${DATABASE_URL/coffee_manager?/shadow?}"` — sin repetir usuario ni contraseña. Expresiones probadas en bash; YAML validado; **no ejecutado todavía en GitHub**.
+- El commit anterior sigue en el historial del PR, así que GitGuardian puede seguir marcándolo: se recomendó al usuario marcarlo como falso positivo en su panel (no se reescribió historial ni se hizo push forzado).
+
+### Pendiente / fuera de alcance
+- El usuario debe hacer `git push` de la rama para que el fix llegue al PR y confirmar que `CI / lint-build-test` pasa en GitHub (primera ejecución real del CI nuevo: pasos `test:cov`, `migrate diff` y `test:int`).
+
 ## Sprint 0 · PR 4 — CI: cobertura mínima, schema↔migraciones y lint verde (sesión 2026-09-30)
 
 Rama `ci/cobertura-y-lint` (sobre `test/dominio-pagos`; commits locales, sin push).
