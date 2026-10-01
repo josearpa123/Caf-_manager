@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ContratoVenta, EstadoContratoVenta, Prisma } from '@prisma/client';
+import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { CreateContratoVentaDto } from './dto/create-contrato-venta.dto';
@@ -53,7 +54,13 @@ export class ContratosVentaService {
       include: {
         ...CONTRATO_INCLUDE,
         ventas: {
-          select: { id: true, codigo: true, fecha: true, cantidadKg: true, valorTotal: true },
+          select: {
+            id: true,
+            codigo: true,
+            fecha: true,
+            cantidadKg: true,
+            valorTotal: true,
+          },
           orderBy: { fecha: 'desc' },
         },
       },
@@ -90,14 +97,17 @@ export class ContratosVentaService {
     }
 
     const fecha = new Date();
-    const contrato = await this.prisma.$transaction(async (tx) => {
-      const year = fecha.getUTCFullYear();
-      const prefix = `CTR-${year}-`;
-      const count = await tx.contratoVenta.count({
-        where: { codigo: { startsWith: prefix } },
-      });
-      const codigo = `${prefix}${String(count + 1).padStart(6, '0')}`;
+    // Consecutivo atómico en su propia sentencia (no dentro de la transacción):
+    // la auditoría usa otra conexión, y un candado retenido toda la
+    // transacción agotaría el pool. Puede dejar huecos, nunca duplicados.
+    const codigo = await siguienteConsecutivo(
+      this.prisma,
+      tenantId,
+      'CONTRATO_VENTA',
+      fecha,
+    );
 
+    const contrato = await this.prisma.$transaction(async (tx) => {
       return tx.contratoVenta.create({
         data: {
           tenantId,
@@ -121,7 +131,9 @@ export class ContratosVentaService {
   }
 
   async cancelar(id: string) {
-    const contrato = await this.prisma.contratoVenta.findUnique({ where: { id } });
+    const contrato = await this.prisma.contratoVenta.findUnique({
+      where: { id },
+    });
     if (!contrato) throw new NotFoundException('Contrato no encontrado');
     if (contrato.estado !== EstadoContratoVenta.VIGENTE) {
       throw new BadRequestException(

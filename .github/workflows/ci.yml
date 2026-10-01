@@ -29,9 +29,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # La versión de pnpm sale de "packageManager" en package.json
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - uses: actions/setup-node@v4
         with:
@@ -52,3 +51,17 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Cobertura mínima (recepcion y pagos)
+        run: pnpm --filter api test:cov
+
+      - name: Aplicar migraciones
+        run: pnpm --filter api exec prisma migrate deploy
+
+      - name: El schema coincide con las migraciones
+        run: |
+          psql "${DATABASE_URL%%\?*}" -c 'CREATE DATABASE shadow'
+          pnpm --filter api exec prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "${DATABASE_URL/coffee_manager?/shadow?}" --exit-code
+
+      - name: Pruebas de integración (PostgreSQL real)
+        run: pnpm --filter api test:int

@@ -10,6 +10,7 @@ import {
   TipoInventario,
   TipoMovimientoInventario,
 } from '@prisma/client';
+import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { BodegaService } from '../bodega/bodega.service';
@@ -26,7 +27,11 @@ const VENTA_DETAIL_INCLUDE = {
   lotesOrigen: {
     include: {
       recepcion: {
-        select: { id: true, codigo: true, proveedor: { select: { nombre: true } } },
+        select: {
+          id: true,
+          codigo: true,
+          proveedor: { select: { nombre: true } },
+        },
       },
     },
   },
@@ -87,7 +92,9 @@ export class VentasService {
       where: { id: contratoVentaId },
     });
     if (!contrato)
-      throw new BadRequestException('El contrato indicado no existe en este tenant');
+      throw new BadRequestException(
+        'El contrato indicado no existe en este tenant',
+      );
     if (contrato.estado !== EstadoContratoVenta.VIGENTE) {
       throw new BadRequestException(
         'Este contrato no está vigente (ya fue cumplido o cancelado)',
@@ -110,10 +117,14 @@ export class VentasService {
       ? await this.resolverContrato(dto.contratoVentaId, dto.cantidadKg)
       : null;
 
-    const tipoCafe: TipoInventario = contrato ? contrato.tipoCafe : dto.tipoCafe!;
+    const tipoCafe: TipoInventario = contrato
+      ? contrato.tipoCafe
+      : dto.tipoCafe!;
     const precioKg = contrato ? Number(contrato.precioKg) : dto.precioKg!;
     const compradorId = contrato ? contrato.compradorId : dto.compradorId;
-    const compradorNombre = contrato ? contrato.compradorNombre : dto.compradorNombre!;
+    const compradorNombre = contrato
+      ? contrato.compradorNombre
+      : dto.compradorNombre!;
 
     if (!contrato && dto.compradorId) {
       const comprador = await this.prisma.comprador.findUnique({
@@ -138,7 +149,10 @@ export class VentasService {
       where: { id: { in: dto.lotesOrigen.map((l) => l.recepcionId) } },
       select: { id: true },
     });
-    if (recepciones.length !== new Set(dto.lotesOrigen.map((l) => l.recepcionId)).size) {
+    if (
+      recepciones.length !==
+      new Set(dto.lotesOrigen.map((l) => l.recepcionId)).size
+    ) {
       throw new BadRequestException(
         'Una o más recepciones indicadas como lote de origen no existen en este tenant',
       );
@@ -157,14 +171,17 @@ export class VentasService {
     const valorTotal = Math.round(dto.cantidadKg * precioKg * 100) / 100;
     const fecha = new Date();
 
-    return this.prisma.$transaction(async (tx) => {
-      const year = fecha.getUTCFullYear();
-      const prefix = `VTA-${year}-`;
-      const count = await tx.venta.count({
-        where: { codigo: { startsWith: prefix } },
-      });
-      const codigo = `${prefix}${String(count + 1).padStart(6, '0')}`;
+    // Consecutivo atómico en su propia sentencia (no dentro de la transacción):
+    // la auditoría usa otra conexión, y un candado retenido toda la
+    // transacción agotaría el pool. Puede dejar huecos, nunca duplicados.
+    const codigo = await siguienteConsecutivo(
+      this.prisma,
+      tenantId,
+      'VENTA',
+      fecha,
+    );
 
+    return this.prisma.$transaction(async (tx) => {
       const venta = await tx.venta.create({
         data: {
           tenantId,

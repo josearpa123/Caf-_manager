@@ -2,7 +2,115 @@
 
 > Este archivo se actualiza al final de cada sesión de trabajo relevante. Es lo primero que hay que leer al retomar el proyecto (junto con `docs/requerimientos.md` para decisiones de diseño ya tomadas).
 
-**Última actualización:** 2026-09-27
+**Última actualización:** 2026-09-30
+
+## CI: arreglo de pnpm tras el primer run real en GitHub (sesión 2026-10-01)
+
+Primer run real del CI en el PR #1 (`ci/cobertura-y-lint`): `lint-build-test` falló en 15 s en `pnpm/action-setup@v4` con "Multiple versions of pnpm specified" — el workflow fijaba `version: 11` y `package.json` ya declara `packageManager: pnpm@11.10.0`. **Fallo preexistente** (el mismo bloque venía en `main`), no causado por los cambios del PR, pero impedía que corriera cualquier paso.
+
+- **Fix**: se quitó `with: version: 11` en `.github/workflows/ci.yml`; la versión sale de `packageManager`. `next lint` de la web pasa limpio en local. Los pasos posteriores (lint/build/test, `test:cov`, `migrate deploy`, `migrate diff`, `test:int`) siguen **sin verificarse en GitHub**: es probable que aparezcan fallos nuevos en el siguiente run.
+- **GitGuardian**: sigue marcando el commit `141cef7` (la URL `postgres:postgres@…/shadow` de la contraseña desechable del job). El fix posterior (`9c93837`) no lo limpia del historial del PR. Solución sugerida: marcarlo como falso positivo en el panel de GitGuardian; reescribir historial queda descartado salvo que el usuario lo pida.
+
+### Pendiente / fuera de alcance
+- Push de la rama y revisar el siguiente run del CI.
+
+## CI sin credenciales literales tras alerta de GitGuardian (sesión 2026-09-30)
+
+Al abrir el PR de `ci/cobertura-y-lint`, el bot GitGuardian marcó 1 secreto. Era falso positivo: la URL `postgres:postgres@localhost…/shadow` que se había agregado al paso "El schema coincide con las migraciones" de `.github/workflows/ci.yml` (contraseña desechable del servicio postgres del job; la de `apps/api/.env` local también es `postgres`, pero ese archivo no está versionado). Se comprobó que ni esa contraseña ni los dos secretos JWT locales aparecen en el historial de las ramas más allá de ese literal genérico.
+
+- **Fix** (commit `9c93837`): el paso usa el `DATABASE_URL` del job — `psql "${DATABASE_URL%%\?*}"` (libpq no acepta `?schema=`) y `--shadow-database-url "${DATABASE_URL/coffee_manager?/shadow?}"` — sin repetir usuario ni contraseña. Expresiones probadas en bash; YAML validado; **no ejecutado todavía en GitHub**.
+- El commit anterior sigue en el historial del PR, así que GitGuardian puede seguir marcándolo: se recomendó al usuario marcarlo como falso positivo en su panel (no se reescribió historial ni se hizo push forzado).
+
+### Pendiente / fuera de alcance
+- El usuario debe hacer `git push` de la rama para que el fix llegue al PR y confirmar que `CI / lint-build-test` pasa en GitHub (primera ejecución real del CI nuevo: pasos `test:cov`, `migrate diff` y `test:int`).
+
+## Sprint 0 · PR 4 — CI: cobertura mínima, schema↔migraciones y lint verde (sesión 2026-09-30)
+
+Rama `ci/cobertura-y-lint` (sobre `test/dominio-pagos`; commits locales, sin push).
+
+- **Cubre**: RNF-07, flujo de trabajo de TECNICO.md ("CI: lint, tipos, pruebas y `prisma migrate diff`").
+- **`apps/api/package.json`**: `coverageThreshold` de Jest — 90% líneas/sentencias/funciones y 85% ramas para `src/modules/recepcion/*.service.ts` y `src/modules/pagos/*.service.ts`. Verificado: al quitar una prueba el umbral falla. (Las claves de ruta son relativas a `apps/api`, no a `rootDir`.)
+- **`.github/workflows/ci.yml`**: nuevos pasos — `test:cov` (umbral), `prisma migrate deploy`, `prisma migrate diff --exit-code` (el schema debe coincidir con las migraciones; probado local: "No difference detected") y `test:int` (PostgreSQL del job). YAML validado, **no ejecutado en GitHub todavía**.
+- **Lint**: los únicos errores no-formato eran 4 (`ninguno.provider.ts` 3 parámetros sin usar, `query-viajes.dto.ts` import sin usar) + 1 aviso (`main.ts` promesa sin await) — corregidos sin cambiar comportamiento. Los demás errores que `eslint` muestra son de formato Prettier (líneas largas) y `pnpm lint` los corrige solo con `--fix`; en CI no fallan. Con esto `pnpm lint` queda sin errores en la API (la web no se revisó).
+- **No hecho — requiere acción tuya**: "CI bloquea el merge" exige activar la protección de `main` en GitHub (Settings → Branches → exigir el check `lint-build-test` antes de fusionar). No tengo cómo hacerlo desde aquí.
+
+### Pendiente / fuera de alcance
+- PR 5 (Sentry): agrega dependencias (`@sentry/nestjs`, `@sentry/nextjs`) y necesita DSN; esperar aprobación del usuario.
+
+## Sprint 0 · PR 3 — pruebas unitarias de pagos, cierra H2 (sesión 2026-09-30)
+
+Rama `test/dominio-pagos` (sobre `feat/consecutivos-atomicos`; commits locales, sin push).
+
+- **Cubre**: H2, RNF-07. Sin cambios de código de producción.
+- **Pruebas** (`apps/api/src/modules/pagos/`): `pagos.service.spec.ts`, `anticipos.service.spec.ts`, `conciliaciones.service.spec.ts` — 40 pruebas con Prisma simulado: validaciones de proveedor/punto/recepción/pago, `estadoCuenta` (comprado, pagado excluyendo `CREDITO`, anticipos, conciliado, préstamos vigentes, `saldoNeto` negativo cuando el proveedor debe), saldo disponible del anticipo (aplicar exacto vs. excederlo por 1), filtros y rangos de fecha. Cobertura de líneas 100% en los tres servicios (ramas 88–100%). Total API: 84 unitarias pasan.
+- **Hallazgos de paso** (sin corregir):
+  - `ConciliacionesService.create` verifica el saldo del anticipo leyendo y luego escribiendo, sin transacción ni bloqueo: dos conciliaciones simultáneas pueden sobre-aplicar un anticipo. Mismo patrón de carrera que H1; arreglar con transacción + bloqueo de fila (`SELECT … FOR UPDATE`) o una restricción en BD.
+  - `estadoCuenta` calcula saldos con `Number` (no `Decimal`) y trae todas las filas del proveedor a memoria: aceptable hoy, no escala con historiales largos (usar agregados `SUM` en SQL).
+  - Pagos/anticipos todavía no aceptan llave de idempotencia (regla de dominio 6; sprint 1).
+
+### Pendiente / fuera de alcance
+- PR 4 (CI con cobertura mínima), PR 5 (Sentry — requiere aprobar dependencia).
+
+## Sprint 0 · PR 2 — consecutivos atómicos, cierra H1 (sesión 2026-09-30)
+
+Rama `feat/consecutivos-atomicos` (sobre la de PR 1; commits locales, sin push). Base de pruebas: PostgreSQL 16 del contenedor `docker-postgres-1` en WSL (hay que dejar `wsl -e sleep infinity` corriendo o WSL se apaga y reinicia los contenedores), BD `coffee_manager_test`.
+
+- **Schema**: migración `20261001024919_consecutivos_atomicos` — enum `TipoConsecutivo`, tabla `Consecutivo` (PK `tenantId+tipo+anio`, FK a Tenant) y siembra desde el mayor consecutivo existente por tenant/tipo/año. **Aplicada también a la BD de desarrollo `coffee_manager`**: sembró 7 contadores a partir de 65 recepciones y los demás documentos de la simulación (ej. REC-2026 → 20).
+- **Backend**: `apps/api/src/prisma/consecutivo.ts` (`siguienteConsecutivo`, un `INSERT … ON CONFLICT DO UPDATE … RETURNING`); reemplaza `count()+1` en **7 servicios**: recepción, secado, trilla, préstamos, ventas, contratos de venta y viajes. `Consecutivo` agregado a `scoped-models.ts` (regla de dominio 8). Prettier reformateó de paso algunas líneas largas en `ventas.service.ts` y `contratos-venta.service.ts`.
+- **Pruebas**: `apps/api/test/consecutivos.int-spec.ts` + `test/jest-int.json` + script `pnpm --filter api test:int` (13 pruebas con PostgreSQL real: formato, 7 prefijos, independencia por tipo/año/tenant, siembra, 100 llamadas concurrentes sin repetir ni saltar, y 100 recepciones con `RecepcionService` real). Con el código antiguo la prueba de recepciones falla con `Unique constraint failed on (tenantId, codigo)`; con el nuevo pasan 13/13 en ~1,5 s. Unitarias: 44 pasan. CI (`ci.yml`) ahora corre `prisma migrate deploy` y `test:int`.
+- **Decisiones que difieren del plan** (también en ADR-003 y TECNICO.md): (1) el año va en la llave; (2) el consecutivo se asigna **antes** de abrir la transacción, no dentro (puede dejar huecos, nunca duplicados) — dentro de la transacción el candado agotaba el pool porque la auditoría usa otra conexión.
+- **Hallazgo importante, preexistente y sin corregir**: `audit-log.extension.ts` escribe el `AuditLog` con el cliente base, fuera de la transacción. Efectos: (a) cada recepción necesita 2 conexiones a la vez, así que ≥ ~(pool/2) recepciones simultáneas pueden bloquearse hasta el timeout (pool por defecto = CPUs×2+1, p. ej. 5 en un VPS de 2 vCPU); (b) si la transacción se revierte, el registro de auditoría ya quedó escrito. Por eso la prueba de 100 recepciones usa 10 en vuelo con pool de 20. Pendiente: PR "auditoría transaccional" (y/o fijar `connection_limit` en producción).
+
+### Pendiente / fuera de alcance
+- PR 3 (pruebas de `pagos`), PR 4 (CI con cobertura mínima), PR 5 (Sentry — requiere aprobar dependencia).
+- Auditoría transaccional; migrar plata de `number` a `Decimal`; ~40 errores de lint preexistentes.
+
+## Sprint 0 · PR 1 — pruebas unitarias de dominio de recepción (sesión 2026-09-30)
+
+Pedido del usuario: ejecutar todo el plan de `docs/TECNICO.md`, un PR a la vez con pruebas primero. Rama `test/dominio-calidad-recepcion` (2 commits locales, sin push ni PR abierto).
+
+- **Cubre**: H2, RNF-07 (parcial). Reglas de dominio 2–3 documentadas pero aún no implementadas (llegan en sprints 1–2).
+- **Pruebas agregadas** (`apps/api/src/modules/recepcion/`): `recepcion.service.spec.ts` y `tabla-precios.service.spec.ts` — 42 pruebas con Prisma simulado: peso neto (redondeo, rechazo ≤ 0), factor de rendimiento (CALCULADO/MANUAL, validaciones), tramo de precio (prioridad punto sobre general, sin tramo → 400), valor total, MOJADO/PASILLA con precio directo, movimiento de inventario, análisis y defectos, código `REC-año-NNNNNN`, traducción de P2003, validaciones de proveedor/punto. Cobertura: `recepcion.service.ts` 100% líneas / 94% ramas; `tabla-precios.service.ts` 100%.
+- **Sin cambios de código de producción.** Son pruebas de caracterización: fijan el comportamiento actual antes de refactorizar en el PR 2.
+- **Hallazgos de paso** (no corregidos aquí):
+  - El módulo `calidad` solo sirve el catálogo de defectos; la lógica de calidad (factor, tramo) vive en `recepcion/`. La meta de ≥ 90% en `calidad` es trivial; la real está en `recepcion`.
+  - El cálculo de plata usa `number` + `Math.round` (peso neto, valor total), no `Decimal` — contradice la regla de dominio 1. Migrar a `Prisma.Decimal` queda pendiente (propuesto como PR aparte).
+  - `pnpm lint` corre con `--fix` y reescribe archivos no relacionados (19 en esta sesión; se revirtieron). Además hay ~40 errores de lint preexistentes en `main.ts`, `ninguno.provider.ts`, `query-viajes.dto.ts` y otros: CI (`pnpm lint`) probablemente ya fallaba antes. Pendiente decidir si se arreglan o se ajusta la regla.
+  - No hay Docker ni PostgreSQL local en esta máquina: las pruebas de integración con base real (PR 2) correrán en CI (que tiene servicio postgres) y no se pueden ejecutar localmente sin instalar uno.
+- Los documentos del plan (`CLAUDE.md`, `docs/TECNICO.md`, `docs/adr/`, `docs/diagramas/`) entran en el primer commit de esta rama.
+
+### Pendiente / fuera de alcance
+- PR 2 (consecutivos atómicos), PR 3 (pruebas de `pagos`), PR 4 (CI con cobertura), PR 5 (Sentry).
+
+## Arranca el plan técnico v1.0: documentación y ADR (sesión 2026-09-30)
+
+Pedido del usuario: incorporar la documentación técnica y plan de desarrollo v1.0 al repo (sin tocar código). Los archivos llegaron como `CLAUDE (1).md` y `Coffee Manager — Documentación técnica y plan de desarrollo.md`; el usuario autorizó renombrarlos.
+
+- **Docs**: `CLAUDE.md` (raíz, instrucciones permanentes con reglas de dominio y actualización obligatoria de docs) y `docs/TECNICO.md` (RF/RNF, casos de uso CU-01..03, modelo de datos, arquitectura, escalabilidad, sprints 0–4, hallazgos H1–H8).
+- **Diagramas** (copiados tal cual del anexo de TECNICO.md): `docs/diagramas/mer.md` (MER de 37 tablas: 34 actuales + `Consecutivo`, `ParametroTributario`, `Finca` propuestas) y `docs/diagramas/secuencia-recepcion.md`.
+- **ADR** en `docs/adr/`: `001-monolito-modular`, `002-multitenant-base-compartida`, `003-consecutivos-por-contador`, `004-recepciones-inmutables`, `005-trabajos-externos-por-cola`, `006-hostinger-coolify` (contexto, decisión, consecuencias; redactados a partir de TECNICO.md, que solo da el título de cada uno).
+- Sin cambios de código, schema ni infraestructura.
+
+### Pendiente / fuera de alcance
+- Sprint 0 (consecutivos atómicos H1, pruebas de dominio H2, CI, Sentry) es el siguiente paso; aún no iniciado.
+- Los ADR son borradores derivados del documento: revisar que reflejen lo que el usuario realmente decidió (p. ej. ADR-006).
+- El MER fue copiado del anexo, no regenerado desde `schema.prisma`; regenerar al cambiar el schema.
+
+## Simulación de un mes de operación en 3 tenants + auditoría de bugs (sesión 2026-09-27, continuación)
+
+Pedido del usuario: simular ~1 mes de actividad real con varios negocios ("clientes") comprando y vendiendo café, encontrar fallos y cosas a mejorar, con foco en que la compra/ingreso de datos sea rápido, y reportar si la data generada ocupa mucho espacio en disco.
+
+- **Script de simulación** (`node` ad-hoc contra la API local, no queda en el repo — vivía en el scratchpad de la sesión): creó 3 tenants (`Cooperativa Los Andes Sim`, `Finca El Mirador Sim`, `Trilladora San Jose Sim`), cada uno con 2 puntos de compra, 8 proveedores, tabla de precios (2 tramos), ~24 recepciones mezclando PERGAMINO/MOJADO/PASILLA, procesos de secado y trilla, anticipos/pagos con los 4 métodos de pago, un préstamo con abono parcial, compradores, ventas (incluida una entrega parcial contra un contrato de venta), y casos límite deliberados (proveedor duplicado, anticipo/abono con CREDITO, pago CHEQUE sin número, venta que excede stock, venta con lotes que no cuadran, recepción PERGAMINO fuera de cualquier tramo de precio, tenant con email de admin repetido). Total 233 llamadas API.
+- **Resultado de los casos límite**: todos devuelven 4xx con mensaje claro (verificado también a mano con curl, no solo confiando en el script) — nada de 500 en las validaciones de negocio ya existentes.
+- **Bug encontrado y arreglado — mismo patrón en un segundo lugar**: `UsersService.create()` (`apps/api/src/modules/users/users.service.ts`, usado por `POST /users` para agregar usuarios dentro de un tenant) tenía el mismo problema que se arregló hoy en `PlatformService.createTenant` — `User.email` es único global y no se capturaba el conflicto. Arreglado con el mismo patrón (chequeo previo + catch de `P2002` → 409 `Ese correo ya está en uso por otro usuario`). Verificado con curl: usuario con el email del admin de otro tenant → 409 en vez de 500. **No se auditó ningún otro punto del código que haga `tx.user.create()`** más allá de estos dos (`createTenant` y `RegistroService`, que ya lo manejaba bien) — si aparece un tercero, es la misma causa.
+- **Velocidad**: a nivel de API, excelente — latencia promedio 20ms por llamada, 21ms para un `POST /recepcion` (una compra) sobre 72 muestras, ninguna llamada superó 500ms. La velocidad real de captura en campo depende del formulario del frontend (clics/campos), que no se pudo medir porque la extensión de Claude in Chrome no está conectada en este equipo — evaluación pendiente de una sesión con navegador disponible.
+- **Espacio en disco**: la base de datos local completa pesa **11 MB** y el volumen de Docker `docker_postgres_data` **68.59 MB** — la simulación no representa un problema de espacio ni de lejos. (De paso, se encontraron otros volúmenes Docker de proyectos no relacionados ocupando varios GB en la misma máquina — no se tocaron, es información aparte para el usuario, no de este proyecto.)
+- Los 3 tenants de simulación (`estado: PRUEBA`) quedaron en la base local junto con los datos preexistentes de julio 2026 (`Finca Demo`, `Finca El Roble`, `Cooperativa La Esperanza`, etc.) — no se borraron porque el espacio es insignificante; limpiarlos requeriría un script de borrado en cascada (no existe `DELETE` de tenant en la API a propósito) que no se justificó construir dado lo poco que pesan.
+
+### Pendiente / fuera de alcance
+- Evaluar la velocidad real de captura de datos en el frontend (clics, tabs, campos por formulario) — necesita sesión con extensión de navegador conectada.
+- Auditar el resto del código en busca de más `tx.user.create()` o patrones equivalentes con constraints únicos sin capturar (solo se encontraron y arreglaron los 2 casos que se reprodujeron).
+- Limpieza de los 3 tenants de simulación en la base local, si en algún momento se quiere una base "limpia" para demos (hoy no es necesario, el espacio es mínimo).
 
 ## Setup de entorno local + hook y skill de documentación automática (sesión 2026-09-27)
 
@@ -302,12 +410,16 @@ Para crear el primer tenant de prueba: entrar a `/platform/login` con `PLATFORM_
 
 ## Cómo retomar en la próxima sesión
 
-1. Leer este archivo.
-2. Si hay dudas de diseño, revisar `docs/requerimientos.md`.
-3. **Los 8 módulos de negocio del MVP original ya están implementados** (backend + frontend). No hay "siguiente módulo" obvio; las opciones para la próxima sesión son:
-   - **Conectar un proveedor real de facturación** (Factus o Siigo) el día que el usuario decida cuál — implementar `FacturacionProviderAdapter` en `src/modules/facturacion/adapters/`, registrarlo en `FacturacionModule` y en el `switch` de `facturacion-provider.factory.ts`. Probablemente también haga falta el CRUD de `ResolucionFacturacion` en ese momento (rango de numeración DIAN, hoy no existe).
-   - **QA visual en navegador real** — nunca se ha hecho en ninguna sesión (sin herramienta de automatización disponible en este entorno). Repasar cada módulo a mano sería el mayor salto de confianza posible en este punto.
-   - **Rentabilidad por lote** en Reportes (ver nota en "Pendiente" de esa sección) — cruzar `VentaLoteOrigen` con `Recepcion.valorTotal`.
-   - Cualquiera de las mejoras menores listadas en las secciones "Pendiente" de cada módulo (edición de recepciones, PDF de recibo, filtros de fecha en listados de Pagos, etc.) — ninguna es bloqueante, son pulido.
-   - O lo que el usuario pida directamente; a estas alturas el sistema es funcional de punta a punta (compra → bodega → venta → pago → reporte), así que el trabajo que sigue es más sobre necesidades reales del negocio que sobre huecos del MVP.
-4. Al terminar una sesión de trabajo, actualizar este archivo.
+**Estado (2026-09-30): ejecutando el plan de `docs/TECNICO.md`. Sprint 0 casi cerrado.** Leer `CLAUDE.md` (reglas de dominio y de trabajo), la sección del sprint en `docs/TECNICO.md` y las 4 entradas "Sprint 0 · PR n" de arriba.
+
+1. **Ramas locales encadenadas, sin push ni PR** (cada una parte de la anterior): `test/dominio-calidad-recepcion` → `feat/consecutivos-atomicos` → `test/dominio-pagos` → `ci/cobertura-y-lint` (la última contiene todo). `main` no se tocó. Decidir con el usuario cómo subirlas (¿un PR por rama encadenados, o uno solo?).
+2. **Entorno de pruebas**: PostgreSQL en el contenedor `docker-postgres-1` dentro de WSL Ubuntu (puerto 5432, visible desde Windows). WSL se apaga sola y reinicia los contenedores: antes de probar, iniciar `wsl -e sleep infinity` en segundo plano y `wsl -e docker start docker-postgres-1`. BD de pruebas `coffee_manager_test` (con las migraciones aplicadas); integración: `DATABASE_URL=…/coffee_manager_test pnpm --filter api test:int`. Unitarias: `pnpm --filter api test:cov`. No correr `pnpm lint` suelto: usa `--fix` y reescribe archivos ajenos (usar `npx eslint … --no-fix`).
+3. **Falta del Sprint 0**: PR 5 Sentry (esperando aprobación de dependencias `@sentry/nestjs` y `@sentry/nextjs` + DSN) y que el usuario active la protección de `main` en GitHub.
+4. **Decisiones por confirmar con el usuario**: huecos en la numeración (consecutivo asignado antes de la transacción, ADR-003); orden/forma de los PRs.
+5. **Deuda técnica registrada** (ver entradas del Sprint 0): auditoría no transaccional (`audit-log.extension.ts`, riesgo de bloqueo del pool y auditoría de transacciones revertidas — arreglar pronto), carrera en `ConciliacionesService` (sobre-aplicar anticipos), plata con `number` en vez de `Decimal`, `estadoCuenta` en memoria.
+6. **Siguiente**: Sprint 1 (recepción rápida: `idempotencyKey`, `numeroSacos`, `Proveedor.apodo`, `pg_trgm`, pantalla nueva, 45 s). Parte con una migración expandir; no tocar `.env`.
+
+### Referencias antiguas (MVP original)
+1. Si hay dudas de diseño, revisar `docs/requerimientos.md`.
+2. Los 8 módulos de negocio del MVP original ya están implementados (backend + frontend). Opciones fuera del plan: proveedor real de facturación (Factus/Siigo vía `FacturacionProviderAdapter`), QA visual en navegador (nunca hecho), rentabilidad por lote en Reportes, pulido menor de módulos.
+3. Al terminar una sesión de trabajo, actualizar este archivo.

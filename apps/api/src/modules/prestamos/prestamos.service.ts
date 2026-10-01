@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EstadoPrestamo, Prisma } from '@prisma/client';
+import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { CreatePrestamoDto } from './dto/create-prestamo.dto';
@@ -99,14 +100,17 @@ export class PrestamosService {
     await this.assertPuntoCompraActivo(dto.puntoCompraId);
 
     const fecha = new Date();
-    const prestamo = await this.prisma.$transaction(async (tx) => {
-      const year = fecha.getUTCFullYear();
-      const prefix = `PRE-${year}-`;
-      const count = await tx.prestamo.count({
-        where: { codigo: { startsWith: prefix } },
-      });
-      const codigo = `${prefix}${String(count + 1).padStart(6, '0')}`;
+    // Consecutivo atómico en su propia sentencia (no dentro de la transacción):
+    // la auditoría usa otra conexión, y un candado retenido toda la
+    // transacción agotaría el pool. Puede dejar huecos, nunca duplicados.
+    const codigo = await siguienteConsecutivo(
+      this.prisma,
+      tenantId,
+      'PRESTAMO',
+      fecha,
+    );
 
+    const prestamo = await this.prisma.$transaction(async (tx) => {
       return tx.prestamo.create({
         data: {
           tenantId,

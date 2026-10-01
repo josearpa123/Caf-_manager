@@ -1,8 +1,10 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
@@ -90,29 +92,49 @@ export class UsersService {
       await this.assertPuntoCompraBelongsToTenant(dto.puntoCompraId);
     }
 
+    // El email de User es único a nivel global (no por tenant): revisamos
+    // antes para dar un mensaje claro, igual que /registro y /platform/tenants.
+    const existente = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+      select: { id: true },
+    });
+    if (existente) {
+      throw new ConflictException('Ese correo ya está en uso por otro usuario');
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          tenantId,
-          email: dto.email,
-          nombre: dto.nombre,
-          telefono: dto.telefono,
-          puntoCompraId: dto.puntoCompraId ?? null,
-          passwordHash,
-        },
-      });
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            tenantId,
+            email: dto.email,
+            nombre: dto.nombre,
+            telefono: dto.telefono,
+            puntoCompraId: dto.puntoCompraId ?? null,
+            passwordHash,
+          },
+        });
 
-      await tx.userRole.createMany({
-        data: dto.roleIds.map((roleId) => ({ userId: user.id, roleId })),
-      });
+        await tx.userRole.createMany({
+          data: dto.roleIds.map((roleId) => ({ userId: user.id, roleId })),
+        });
 
-      return tx.user.findUniqueOrThrow({
-        where: { id: user.id },
-        select: USER_SAFE_SELECT,
+        return tx.user.findUniqueOrThrow({
+          where: { id: user.id },
+          select: USER_SAFE_SELECT,
+        });
       });
-    });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Ese correo ya está en uso por otro usuario');
+      }
+      throw error;
+    }
   }
 
   async update(id: string, dto: UpdateUserDto) {

@@ -11,6 +11,7 @@ import {
   TipoInventario,
   TipoMovimientoInventario,
 } from '@prisma/client';
+import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { TablaPreciosService } from './tabla-precios.service';
@@ -186,14 +187,17 @@ export class RecepcionService {
     const valorTotal = Math.round(pesoNeto * precioKg * 100) / 100;
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        const year = fecha.getUTCFullYear();
-        const prefix = `REC-${year}-`;
-        const count = await tx.recepcion.count({
-          where: { codigo: { startsWith: prefix } },
-        });
-        const codigo = `${prefix}${String(count + 1).padStart(6, '0')}`;
+      // Consecutivo atómico en su propia sentencia (no dentro de la transacción):
+      // la auditoría usa otra conexión, y un candado retenido toda la
+      // transacción agotaría el pool. Puede dejar huecos, nunca duplicados.
+      const codigo = await siguienteConsecutivo(
+        this.prisma,
+        tenantId,
+        'RECEPCION',
+        fecha,
+      );
 
+      return await this.prisma.$transaction(async (tx) => {
         const recepcion = await tx.recepcion.create({
           data: {
             tenantId,
