@@ -37,7 +37,7 @@ Los diagramas de este documento son la versión para leer. El anexo trae los mis
 | # | Hallazgo | Dónde | Riesgo | Corrección |
 | --- | --- | --- | --- | --- |
 | H1 ✅ | El código de recepción (`REC-2026-000123`) se genera con `count()` + 1 | `recepcion.service.ts` | Dos recepciones simultáneas en el mismo tenant obtienen el mismo código y una falla con error 500. Además `count()` se vuelve más lento a medida que crece la tabla | Tabla de consecutivos por tenant y tipo con `UPDATE … RETURNING` atómico (sprint 0) |
-| H2 | Solo existe la prueba e2e de ejemplo; no hay pruebas de los cálculos | `apps/api/test` | Un cambio en el factor o el precio puede romper la plata de los clientes sin que nadie lo note | Pruebas unitarias del dominio con meta de cobertura (sprint 0) |
+| H2 ✅ | Solo existe la prueba e2e de ejemplo; no hay pruebas de los cálculos | `apps/api/test` | Un cambio en el factor o el precio puede romper la plata de los clientes sin que nadie lo note | Pruebas unitarias del dominio con meta de cobertura (sprint 0) |
 | H3 | El formulario de recepción pide 9+ campos sin valores por defecto | `recepcion/nueva/page.tsx` | No se cumple la meta de 45 segundos; el usuario vuelve al cuaderno | Recepción rápida (sprint 1) |
 | H4 | No hay anulación de recepciones ni campo de estado | modelo `Recepcion` | Los errores de digitación se quedan para siempre o se borran sin rastro | Estado + anulación con movimiento compensatorio (sprint 2) |
 | H5 | No hay cálculo de retención en la fuente | dominio de recepción y pagos | Incumplimiento tributario del cliente; argumento de venta perdido | Parámetros tributarios con vigencia (sprint 2) |
@@ -61,7 +61,7 @@ Los diagramas de este documento son la versión para leer. El anexo trae los mis
 
 | Sprint | Estado | Detalle |
 | --- | --- | --- |
-| 0 · Bases | En curso | PR 1 hecho (pruebas de dominio de recepción, H2 parcial). PR 2 hecho: consecutivos atómicos en los 7 servicios (**H1 cerrado**). Pendiente: pruebas de `pagos`, CI con cobertura, Sentry |
+| 0 · Bases | En curso | PR 1 hecho (pruebas de dominio de recepción, H2 parcial). PR 2 hecho: consecutivos atómicos en los 7 servicios (**H1 cerrado**). PR 3 hecho: pruebas de `pagos` (**H2 cerrado** en lo funcional; cobertura 100% de líneas en `recepcion` y `pagos`). Pendiente: CI con cobertura mínima, Sentry |
 | 1–4 | Pendiente | — |
 
 **Fase 2 (enero–marzo de 2027), solo si pasa el punto de decisión del 5 de enero:** documento soporte electrónico con un proveedor tecnológico (H8), modo sin conexión (PWA con cola local), cobro de la suscripción y suspensión por mora dentro de la plataforma.

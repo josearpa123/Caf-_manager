@@ -4,6 +4,20 @@
 
 **Última actualización:** 2026-09-30
 
+## Sprint 0 · PR 3 — pruebas unitarias de pagos, cierra H2 (sesión 2026-09-30)
+
+Rama `test/dominio-pagos` (sobre `feat/consecutivos-atomicos`; commits locales, sin push).
+
+- **Cubre**: H2, RNF-07. Sin cambios de código de producción.
+- **Pruebas** (`apps/api/src/modules/pagos/`): `pagos.service.spec.ts`, `anticipos.service.spec.ts`, `conciliaciones.service.spec.ts` — 40 pruebas con Prisma simulado: validaciones de proveedor/punto/recepción/pago, `estadoCuenta` (comprado, pagado excluyendo `CREDITO`, anticipos, conciliado, préstamos vigentes, `saldoNeto` negativo cuando el proveedor debe), saldo disponible del anticipo (aplicar exacto vs. excederlo por 1), filtros y rangos de fecha. Cobertura de líneas 100% en los tres servicios (ramas 88–100%). Total API: 84 unitarias pasan.
+- **Hallazgos de paso** (sin corregir):
+  - `ConciliacionesService.create` verifica el saldo del anticipo leyendo y luego escribiendo, sin transacción ni bloqueo: dos conciliaciones simultáneas pueden sobre-aplicar un anticipo. Mismo patrón de carrera que H1; arreglar con transacción + bloqueo de fila (`SELECT … FOR UPDATE`) o una restricción en BD.
+  - `estadoCuenta` calcula saldos con `Number` (no `Decimal`) y trae todas las filas del proveedor a memoria: aceptable hoy, no escala con historiales largos (usar agregados `SUM` en SQL).
+  - Pagos/anticipos todavía no aceptan llave de idempotencia (regla de dominio 6; sprint 1).
+
+### Pendiente / fuera de alcance
+- PR 4 (CI con cobertura mínima), PR 5 (Sentry — requiere aprobar dependencia).
+
 ## Sprint 0 · PR 2 — consecutivos atómicos, cierra H1 (sesión 2026-09-30)
 
 Rama `feat/consecutivos-atomicos` (sobre la de PR 1; commits locales, sin push). Base de pruebas: PostgreSQL 16 del contenedor `docker-postgres-1` en WSL (hay que dejar `wsl -e sleep infinity` corriendo o WSL se apaga y reinicia los contenedores), BD `coffee_manager_test`.
