@@ -81,6 +81,20 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "./src/modules/recepcion/*.service.ts": {
+        "lines": 90,
+        "statements": 90,
+        "functions": 90,
+        "branches": 85
+      },
+      "./src/modules/pagos/*.service.ts": {
+        "lines": 90,
+        "statements": 90,
+        "functions": 90,
+        "branches": 85
+      }
+    },
     "testEnvironment": "node"
   },
   "prisma": {

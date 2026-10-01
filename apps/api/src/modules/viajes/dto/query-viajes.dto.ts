@@ -1,4 +1,4 @@
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional } from 'class-validator';
 import { EstadoViaje } from '@prisma/client';
 
 export class QueryViajesDto {

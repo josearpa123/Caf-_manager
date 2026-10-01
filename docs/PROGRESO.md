@@ -4,6 +4,19 @@
 
 **Última actualización:** 2026-09-30
 
+## Sprint 0 · PR 4 — CI: cobertura mínima, schema↔migraciones y lint verde (sesión 2026-09-30)
+
+Rama `ci/cobertura-y-lint` (sobre `test/dominio-pagos`; commits locales, sin push).
+
+- **Cubre**: RNF-07, flujo de trabajo de TECNICO.md ("CI: lint, tipos, pruebas y `prisma migrate diff`").
+- **`apps/api/package.json`**: `coverageThreshold` de Jest — 90% líneas/sentencias/funciones y 85% ramas para `src/modules/recepcion/*.service.ts` y `src/modules/pagos/*.service.ts`. Verificado: al quitar una prueba el umbral falla. (Las claves de ruta son relativas a `apps/api`, no a `rootDir`.)
+- **`.github/workflows/ci.yml`**: nuevos pasos — `test:cov` (umbral), `prisma migrate deploy`, `prisma migrate diff --exit-code` (el schema debe coincidir con las migraciones; probado local: "No difference detected") y `test:int` (PostgreSQL del job). YAML validado, **no ejecutado en GitHub todavía**.
+- **Lint**: los únicos errores no-formato eran 4 (`ninguno.provider.ts` 3 parámetros sin usar, `query-viajes.dto.ts` import sin usar) + 1 aviso (`main.ts` promesa sin await) — corregidos sin cambiar comportamiento. Los demás errores que `eslint` muestra son de formato Prettier (líneas largas) y `pnpm lint` los corrige solo con `--fix`; en CI no fallan. Con esto `pnpm lint` queda sin errores en la API (la web no se revisó).
+- **No hecho — requiere acción tuya**: "CI bloquea el merge" exige activar la protección de `main` en GitHub (Settings → Branches → exigir el check `lint-build-test` antes de fusionar). No tengo cómo hacerlo desde aquí.
+
+### Pendiente / fuera de alcance
+- PR 5 (Sentry): agrega dependencias (`@sentry/nestjs`, `@sentry/nextjs`) y necesita DSN; esperar aprobación del usuario.
+
 ## Sprint 0 · PR 3 — pruebas unitarias de pagos, cierra H2 (sesión 2026-09-30)
 
 Rama `test/dominio-pagos` (sobre `feat/consecutivos-atomicos`; commits locales, sin push).

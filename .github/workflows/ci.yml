@@ -53,8 +53,16 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Cobertura mínima (recepcion y pagos)
+        run: pnpm --filter api test:cov
+
       - name: Aplicar migraciones
         run: pnpm --filter api exec prisma migrate deploy
+
+      - name: El schema coincide con las migraciones
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE shadow'
+          pnpm --filter api exec prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url 'postgresql://postgres:postgres@localhost:5432/shadow?schema=public' --exit-code
 
       - name: Pruebas de integración (PostgreSQL real)
         run: pnpm --filter api test:int
