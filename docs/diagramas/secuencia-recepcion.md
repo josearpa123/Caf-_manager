@@ -19,9 +19,10 @@ sequenceDiagram
   Web->>Web: Calcula tara, neto, factor, precio y retención (vista previa)
   Op->>Web: Guardar e imprimir
   Web->>API: POST /recepciones con Idempotency-Key
-  API->>DB: ¿Existe esa llave? Si existe, devuelve la recepción ya creada
-  API->>DB: BEGIN
+  API->>DB: ¿Existe esa llave? Si existe, devuelve la recepción ya creada (otro cuerpo: 409)
   API->>DB: UPDATE Consecutivo ... RETURNING valorActual
+  API->>DB: BEGIN
+  API->>DB: INSERT IdempotencyKey (reserva; si otra petición confirmó, rollback y devuelve la suya)
   API->>DB: INSERT Recepcion, AnalisisCalidad, MovimientoInventario
   API->>DB: INSERT Pago y ConciliacionAnticipo (opcional)
   API->>DB: COMMIT y AuditLog

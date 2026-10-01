@@ -1,10 +1,19 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { Modulo, Permission } from '@prisma/client';
 import { RecepcionService } from './recepcion.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { RequireModulo } from '../../common/decorators/require-modulo.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateRecepcionDto } from './dto/create-recepcion.dto';
+import { validarLlave } from '../../prisma/idempotencia';
 import { QueryRecepcionesDto } from './dto/query-recepciones.dto';
 
 @Controller('recepcion')
@@ -30,7 +39,13 @@ export class RecepcionController {
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('userId') userId: string,
     @Body() dto: CreateRecepcionDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.recepcionService.create(tenantId, userId, dto);
+    return this.recepcionService.create(
+      tenantId,
+      userId,
+      dto,
+      validarLlave(idempotencyKey),
+    );
   }
 }

@@ -42,7 +42,7 @@ Los diagramas de este documento son la versión para leer. El anexo trae los mis
 | H4 | No hay anulación de recepciones ni campo de estado | modelo `Recepcion` | Los errores de digitación se quedan para siempre o se borran sin rastro | Estado + anulación con movimiento compensatorio (sprint 2) |
 | H5 | No hay cálculo de retención en la fuente | dominio de recepción y pagos | Incumplimiento tributario del cliente; argumento de venta perdido | Parámetros tributarios con vigencia (sprint 2) |
 | H6 | No hay cola de trabajos; Redis está en el compose pero la API no lo usa | infraestructura | Generar PDFs, enviar WhatsApp o llamar a la DIAN dentro de la petición la vuelve lenta y frágil | BullMQ sobre Redis (sprint 3) |
-| H7 | No hay protección contra reintentos (idempotencia) | `POST /recepciones` | Con mala señal, el usuario oprime dos veces y se crean dos recepciones | Llave de idempotencia por petición (sprint 1) |
+| H7 ✅ | No hay protección contra reintentos (idempotencia) | `POST /recepciones` | Con mala señal, el usuario oprime dos veces y se crean dos recepciones | Llave de idempotencia por petición (sprint 1; backend de recepción hecho, ver ADR-007; falta enviarla desde la web y aplicarla a pagos, anticipos y ventas) |
 | H8 | El módulo de facturación modela "factura" por recepción | modelo `Factura` | La compra a un caficultor no obligado se soporta con documento soporte, no con factura | Generalizar a `DocumentoElectronico` con tipo (fase 2) |
 
 ## Plan de desarrollo
@@ -62,7 +62,8 @@ Los diagramas de este documento son la versión para leer. El anexo trae los mis
 | Sprint | Estado | Detalle |
 | --- | --- | --- |
 | 0 · Bases | En curso | PR 1 hecho (pruebas de dominio de recepción, H2 parcial). PR 2 hecho: consecutivos atómicos en los 7 servicios (**H1 cerrado**). PR 3 hecho: pruebas de `pagos` (**H2 cerrado** en lo funcional; cobertura 100% de líneas en `recepcion` y `pagos`). PR 4 hecho: CI con umbral de cobertura (90% líneas en servicios de `recepcion` y `pagos`), verificación schema↔migraciones y pruebas de integración. Pendiente: Sentry (requiere aprobar dependencias) y activar la protección de la rama `main` en GitHub |
-| 1–4 | Pendiente | — |
+| 1 · Recepción rápida | En curso | PR 1 hecho: idempotencia en `POST /recepcion` con tabla genérica `IdempotencyKey` (ADR-007, **H7 cerrado en el backend de recepción**). Pendiente: idempotencia en pagos, anticipos y ventas; búsqueda de proveedor con `pg_trgm`; pantalla de recepción rápida (H3) |
+| 2–4 | Pendiente | — |
 
 **Fase 2 (enero–marzo de 2027), solo si pasa el punto de decisión del 5 de enero:** documento soporte electrónico con un proveedor tecnológico (H8), modo sin conexión (PWA con cola local), cobro de la suscripción y suspensión por mora dentro de la plataforma.
 
@@ -206,7 +207,8 @@ El administrador puede hacer todo lo del operador. "Registrar recepción rápida
 | --- | --- | --- | --- | --- |
 | `Consecutivo` (nueva, hecha) | `tenantId`, `tipo`, `anio` | `String`, enum (`RECEPCION`, `SECADO`, `TRILLA`, `PRESTAMO`, `VENTA`, `CONTRATO_VENTA`, `VIAJE`), `Int` | Llave primaria compuesta; el año en la llave evita reinicios al registrar fechas de otro año | 0 |
 | `Consecutivo` | `prefijo`, `valorActual` | `String`, `Int` | Se incrementa con `INSERT … ON CONFLICT DO UPDATE … RETURNING` atómico, justo antes de la transacción de negocio (ver ADR-003) | 0 |
-| `Recepcion` | `idempotencyKey` | `String?` | Único por `(tenantId, idempotencyKey)`; lo genera el cliente (UUID) | 1 |
+| `IdempotencyKey` (nueva, hecha) | `tenantId`, `alcance`, `llave` | `String` ×3 | Llave primaria compuesta; la genera el cliente (UUID) y viaja en el encabezado `Idempotency-Key`. Sirve a todos los módulos de plata (ADR-007) | 1 |
+| `IdempotencyKey` | `hashSolicitud`, `recursoId`, `expiraEn` | `String`, `String?`, `DateTime` | Se reserva como primera sentencia de la transacción de negocio y se completa con el id creado; vigencia de 24 h; misma llave con otro cuerpo → 409 | 1 |
 | `Recepcion` | `numeroSacos` | `Int?` | Tara = sacos × `ConfiguracionTenant.taraPorSacoKg` | 1 |
 | `Proveedor` | `apodo` | `String?` | Buscable; índice de trigramas (`pg_trgm`) sobre nombre, apodo y cédula | 1 |
 | `ConfiguracionTenant` | `taraPorSacoKg`, `esAgenteRetencion` | `Decimal`, `Boolean` | Valores por defecto de la recepción rápida y la retención | 1–2 |
@@ -240,6 +242,7 @@ El administrador puede hacer todo lo del operador. "Registrar recepción rápida
 4. ADR-004 · Recepciones inmutables: corregir es anular y volver a registrar.
 5. ADR-005 · Trabajos externos por cola (BullMQ), nunca dentro de la petición.
 6. ADR-006 · Hostinger KVM 2 con Coolify como plataforma de despliegue.
+7. ADR-007 · Idempotencia con tabla genérica de llaves reservada dentro de la transacción.
 
 ## Escalabilidad sin cuellos de botella
 

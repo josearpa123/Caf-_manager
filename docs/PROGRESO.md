@@ -2,7 +2,24 @@
 
 > Este archivo se actualiza al final de cada sesión de trabajo relevante. Es lo primero que hay que leer al retomar el proyecto (junto con `docs/requerimientos.md` para decisiones de diseño ya tomadas).
 
-**Última actualización:** 2026-09-30
+**Última actualización:** 2026-10-01
+
+## Sprint 1 · PR 1 — idempotencia en recepciones, cierra H7 en el backend (sesión 2026-10-01)
+
+Rama `feat/idempotencia` (sobre `main` de GitHub, PR #2 ya fusionado).
+
+- **Cubre**: H7, regla de dominio 6 (solo recepción por ahora), CU-01 flujo 7a, RNF-07.
+- **Decisión (del usuario)**: tabla genérica `IdempotencyKey` en vez de una columna en `Recepcion`; 409 con misma llave y otro cuerpo; vigencia 24 h. Detalle en `docs/adr/007-idempotencia-tabla-de-llaves.md`. **El plan de `TECNICO.md` decía `Recepcion.idempotencyKey`**: se corrigió el diccionario de datos y el MER.
+- **Schema**: migración aditiva `20261001120000_idempotency_keys` (tabla, índice por `expiraEn`, FK a `Tenant`); aplicada a las BD `coffee_manager` y `coffee_manager_test`. Modelo agregado a `TENANT_SCOPED_MODELS` (no va a `AUDITED_MODELS`: no mueve plata).
+- **Código**: `apps/api/src/prisma/idempotencia.ts` (validar llave, huella del cuerpo, buscar, reservar, completar); `POST /recepcion` lee el encabezado `Idempotency-Key` (opcional en el servidor). La reserva es lo primero dentro de la transacción de negocio: un duplicado concurrente espera al COMMIT/ROLLBACK del primero.
+- **Pruebas**: 17 unitarias del helper, 5 del servicio (sin llave, llave nueva, reintento, 409, carrera) y 7 de integración con PostgreSQL real (dos veces, 10 simultáneas, otro cuerpo, tenants distintos, vencida, rollback). API: 106 unitarias y 20 de integración en verde; `recepcion.service.ts` 100% líneas.
+- **Diagramas**: MER (entidad nueva, se quitó `Recepcion.idempotencyKey`) y secuencia de recepción (el consecutivo se asigna antes del `BEGIN`, como dice ADR-003).
+
+### Pendiente / fuera de alcance
+- Idempotencia en pagos, anticipos y ventas (mismo helper), PR siguiente.
+- La web aún no envía `Idempotency-Key` (va con la pantalla de recepción rápida).
+- Limpieza de llaves vencidas: cola BullMQ, Sprint 3.
+- Hallazgo de paso: el CLAUDE.md y TECNICO hablan de `POST /recepciones`, la ruta real es `POST /recepcion`.
 
 ## README renovado con capturas y hoja de ruta (sesión 2026-10-01)
 

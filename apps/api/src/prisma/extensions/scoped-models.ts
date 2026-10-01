@@ -36,6 +36,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   'AuditLog',
   'Notificacion',
   'Consecutivo',
+  'IdempotencyKey',
 ]);
 
 export const READ_OPS = new Set([

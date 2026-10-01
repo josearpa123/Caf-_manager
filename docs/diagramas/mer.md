@@ -1,6 +1,6 @@
 # Modelo entidad-relación completo
 
-Generado desde `apps/api/prisma/schema.prisma` (34 tablas actuales + 3 propuestas: `Consecutivo`, `ParametroTributario`, `Finca`). Regenerar cada vez que cambie el schema. Fuente: `docs/TECNICO.md` (anexo).
+Generado desde `apps/api/prisma/schema.prisma` (35 tablas actuales + 2 propuestas: `ParametroTributario`, `Finca`). Regenerar cada vez que cambie el schema. Fuente: `docs/TECNICO.md` (anexo).
 
 ```mermaid
 erDiagram
@@ -94,6 +94,7 @@ erDiagram
   User ||--o{ Notificacion : "user"
   PuntoCompra |o--o{ Notificacion : "puntoCompra"
   Tenant ||--o{ Consecutivo : "tenant"
+  Tenant ||--o{ IdempotencyKey : "tenant"
   Tenant ||--o{ Finca : "tenant"
   Proveedor ||--o{ Finca : "proveedor"
   Finca |o--o{ Recepcion : "finca"
@@ -188,7 +189,6 @@ erDiagram
     decimal valorTotal
     decimal valorRetencion
     EstadoRecepcion estado
-    string idempotencyKey
     string decididoPorId FK
     string createdById FK
   }
@@ -352,6 +352,14 @@ erDiagram
     string prefijo
     int anio
     int valorActual
+  }
+  IdempotencyKey {
+    string tenantId PK
+    string alcance PK
+    string llave PK
+    string hashSolicitud
+    string recursoId
+    datetime expiraEn
   }
   ParametroTributario {
     string id PK
