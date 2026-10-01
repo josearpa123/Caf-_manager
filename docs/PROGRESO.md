@@ -2,7 +2,18 @@
 
 > Este archivo se actualiza al final de cada sesión de trabajo relevante. Es lo primero que hay que leer al retomar el proyecto (junto con `docs/requerimientos.md` para decisiones de diseño ya tomadas).
 
-**Última actualización:** 2026-09-30
+**Última actualización:** 2026-10-01
+
+## Deploy solo manual hasta el Sprint 3 (sesión 2026-10-01)
+
+El workflow `Deploy` fallaba en cada push a `main` (`curl: (3) URL rejected`): llama al webhook de Coolify con `COOLIFY_WEBHOOK_URL` / `COOLIFY_API_TOKEN`, que no existen porque el servidor es del Sprint 3. Era ruido rojo en GitHub sin relación con el código.
+
+- **Fix**: `.github/workflows/deploy.yml` queda solo con `workflow_dispatch`; el trigger `push` a `main` está comentado con la instrucción de restaurarlo. Sin cambios de código ni dependencias.
+- El workflow `CI` no se tocó (verde en PR #1 y #2).
+
+### Pendiente / fuera de alcance
+- Sprint 3: crear los secretos en GitHub, montar Coolify y restaurar el trigger `push`.
+- Nota de entorno: el remoto `origin` es SSH y esta sesión no tiene llave; se usó `gh` y HTTPS. La `main` local tiene 1 commit viejo sin subir y está desalineada de `origin/main`.
 
 ## README renovado con capturas y hoja de ruta (sesión 2026-10-01)
 
