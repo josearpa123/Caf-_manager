@@ -121,3 +121,72 @@ export async function completarLlave(
   await db.$executeRaw`UPDATE "IdempotencyKey" SET "recursoId" = ${recursoId}
     WHERE "tenantId" = ${tenantId} AND "alcance" = ${alcance} AND "llave" = ${llave}`;
 }
+
+// Pasos que el servicio ejecuta dentro de su transacción de negocio. Sin llave
+// son no-ops, así el servicio no ramifica.
+export interface PasosIdempotencia {
+  // Primera sentencia de la transacción.
+  reservar(tx: ClienteRaw): Promise<void>;
+  // Última: anota el id del documento creado.
+  completar(tx: ClienteRaw, recursoId: string): Promise<void>;
+}
+
+const SIN_LLAVE: PasosIdempotencia = {
+  reservar: () => Promise.resolve(),
+  completar: () => Promise.resolve(),
+};
+
+// Envoltorio común de los endpoints que mueven plata (ADR-007).
+//
+// - Llave ya usada con el mismo cuerpo → `obtener(id)` del documento previo.
+// - Llave ya usada con otro cuerpo → 409.
+// - Llave nueva → `ejecutar(pasos)`; el servicio debe llamar a `pasos.reservar`
+//   al abrir su transacción y a `pasos.completar` antes de cerrarla. Si en ese
+//   momento otra petición ya había confirmado la misma llave, hace rollback y
+//   se devuelve el documento de la ganadora.
+export async function ejecutarConLlave<T>(opciones: {
+  db: ClienteRaw;
+  tenantId: string;
+  alcance: string;
+  llave: string | undefined;
+  cuerpo: unknown;
+  obtener: (recursoId: string) => Promise<T>;
+  ejecutar: (pasos: PasosIdempotencia) => Promise<T>;
+}): Promise<T> {
+  const { db, tenantId, alcance, llave, cuerpo, obtener, ejecutar } = opciones;
+  if (!llave) return ejecutar(SIN_LLAVE);
+
+  const hash = hashSolicitud(cuerpo);
+  const previo = await buscarResultadoIdempotente(
+    db,
+    tenantId,
+    alcance,
+    llave,
+    hash,
+  );
+  if (previo) return obtener(previo);
+
+  try {
+    return await ejecutar({
+      reservar: async (tx) => {
+        if (!(await reservarLlave(tx, tenantId, alcance, llave, hash))) {
+          throw new IdempotenciaDuplicada();
+        }
+      },
+      completar: (tx, recursoId) =>
+        completarLlave(tx, tenantId, alcance, llave, recursoId),
+    });
+  } catch (error) {
+    if (error instanceof IdempotenciaDuplicada) {
+      const ganadora = await buscarResultadoIdempotente(
+        db,
+        tenantId,
+        alcance,
+        llave,
+        hash,
+      );
+      if (ganadora) return obtener(ganadora);
+    }
+    throw error;
+  }
+}

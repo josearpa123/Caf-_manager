@@ -11,6 +11,10 @@ import {
   TipoMovimientoInventario,
 } from '@prisma/client';
 import { siguienteConsecutivo } from '../../prisma/consecutivo';
+import {
+  ejecutarConLlave,
+  type PasosIdempotencia,
+} from '../../prisma/idempotencia';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { BodegaService } from '../bodega/bodega.service';
@@ -36,6 +40,8 @@ const VENTA_DETAIL_INCLUDE = {
     },
   },
 } as const;
+
+const ALCANCE_IDEMPOTENCIA = 'VENTA';
 
 @Injectable()
 export class VentasService {
@@ -110,7 +116,31 @@ export class VentasService {
     return contrato;
   }
 
-  async create(tenantId: string, createdById: string, dto: CreateVentaDto) {
+  // Con `llave` (encabezado Idempotency-Key) un reintento no duplica la venta
+  // ni su salida de inventario (regla de dominio 6, ADR-007).
+  create(
+    tenantId: string,
+    createdById: string,
+    dto: CreateVentaDto,
+    llave?: string,
+  ) {
+    return ejecutarConLlave({
+      db: this.prisma,
+      tenantId,
+      alcance: ALCANCE_IDEMPOTENCIA,
+      llave,
+      cuerpo: dto,
+      obtener: (id) => this.findOne(id),
+      ejecutar: (pasos) => this.crear(tenantId, createdById, dto, pasos),
+    });
+  }
+
+  private async crear(
+    tenantId: string,
+    createdById: string,
+    dto: CreateVentaDto,
+    pasos: PasosIdempotencia,
+  ) {
     await this.assertPuntoCompraActivo(dto.puntoCompraId);
 
     const contrato = dto.contratoVentaId
@@ -182,6 +212,7 @@ export class VentasService {
     );
 
     return this.prisma.$transaction(async (tx) => {
+      await pasos.reservar(tx);
       const venta = await tx.venta.create({
         data: {
           tenantId,
@@ -236,6 +267,8 @@ export class VentasService {
           },
         });
       }
+
+      await pasos.completar(tx, venta.id);
 
       return tx.venta.findUniqueOrThrow({
         where: { id: venta.id },

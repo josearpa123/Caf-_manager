@@ -1,10 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { MetodoPago } from '@prisma/client';
+import { hashSolicitud } from '../../prisma/idempotencia';
 import { AnticiposService } from './anticipos.service';
 
 function build() {
-  const prisma = {
+  const prisma: Record<string, any> = {
+    $queryRaw: jest.fn().mockResolvedValue([{ llave: 'llave-1234' }]),
+    $executeRaw: jest.fn().mockResolvedValue(1),
     anticipo: {
       findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn(),
@@ -17,6 +20,7 @@ function build() {
       findUnique: jest.fn().mockResolvedValue({ id: 'pc1', activo: true }),
     },
   };
+  prisma.$transaction = jest.fn((fn: (t: unknown) => unknown) => fn(prisma));
   return { service: new AnticiposService(prisma as never), prisma };
 }
 
@@ -109,5 +113,51 @@ describe('AnticiposService', () => {
     expect(
       prisma.anticipo.findMany.mock.calls[0][0].where.fecha,
     ).toBeUndefined();
+  });
+
+  describe('create · idempotencia (Idempotency-Key)', () => {
+    it('sin llave no toca la tabla de llaves', async () => {
+      const { service, prisma } = build();
+      await service.create('t1', 'u1', dto);
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('llave nueva: reserva, crea y completa con el id del anticipo', async () => {
+      const { service, prisma } = build();
+      prisma.$queryRaw
+        .mockResolvedValueOnce([]) // buscar: llave nueva
+        .mockResolvedValueOnce([{ llave: 'llave-1234' }]); // reservar
+      await service.create('t1', 'u1', dto, 'llave-1234');
+      expect(prisma.anticipo.create).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw.mock.calls[0]).toContain('a1');
+    });
+
+    it('reintento: devuelve el anticipo previo sin crear otro', async () => {
+      const { service, prisma } = build();
+      prisma.$queryRaw.mockResolvedValueOnce([
+        { hashSolicitud: hashSolicitud(dto), recursoId: 'a1' },
+      ]);
+      prisma.anticipo.findUnique.mockResolvedValue({
+        id: 'a1',
+        monto: 200000,
+        conciliaciones: [],
+      });
+      const r = await service.create('t1', 'u1', dto, 'llave-1234');
+      expect(r).toMatchObject({ id: 'a1', saldoDisponible: 200000 });
+      expect(prisma.anticipo.create).not.toHaveBeenCalled();
+    });
+
+    it('misma llave con otro monto → 409', async () => {
+      const { service, prisma } = build();
+      prisma.$queryRaw.mockResolvedValueOnce([
+        {
+          hashSolicitud: hashSolicitud({ ...dto, monto: 1 }),
+          recursoId: 'a1',
+        },
+      ]);
+      await expect(
+        service.create('t1', 'u1', dto, 'llave-1234'),
+      ).rejects.toThrow(ConflictException);
+    });
   });
 });

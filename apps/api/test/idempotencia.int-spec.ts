@@ -3,6 +3,10 @@ import { PrismaClient, TipoCafeRecepcion } from '@prisma/client';
 import { auditLogExtension } from '../src/prisma/extensions/audit-log.extension';
 import { tenantScopingExtension } from '../src/prisma/extensions/tenant-scoping.extension';
 import { RecepcionService } from '../src/modules/recepcion/recepcion.service';
+import { PagosService } from '../src/modules/pagos/pagos.service';
+import { AnticiposService } from '../src/modules/pagos/anticipos.service';
+import { VentasService } from '../src/modules/ventas/ventas.service';
+import { BodegaService } from '../src/modules/bodega/bodega.service';
 
 // Requiere PostgreSQL real con las migraciones aplicadas (DATABASE_URL).
 const prisma = new PrismaClient({
@@ -40,6 +44,9 @@ async function crearTenant(nombre: string) {
     .$extends(auditLogExtension(tenant.id, user.id));
   // TablaPreciosService no se usa: MOJADO va con precio directo.
   const service = new RecepcionService(scoped, {} as never);
+  const pagos = new PagosService(scoped);
+  const anticipos = new AnticiposService(scoped);
+  const ventas = new VentasService(scoped, new BodegaService(scoped));
   const dto = (pesoBruto = 50) => ({
     puntoCompraId: punto.id,
     proveedorId: proveedor.id,
@@ -50,7 +57,18 @@ async function crearTenant(nombre: string) {
   });
   const contar = () =>
     prisma.recepcion.count({ where: { tenantId: tenant.id } });
-  return { tenant, user, service, dto, contar };
+  return {
+    tenant,
+    user,
+    punto,
+    proveedor,
+    service,
+    pagos,
+    anticipos,
+    ventas,
+    dto,
+    contar,
+  };
 }
 
 describe('Idempotencia de recepciones (PostgreSQL real)', () => {
@@ -148,5 +166,108 @@ describe('Idempotencia de recepciones (PostgreSQL real)', () => {
     // el cliente corrige y reintenta con la misma llave
     await service.create(tenant.id, user.id, dto(), 'llave-falla-001');
     expect(await contar()).toBe(1);
+  });
+});
+
+describe('Idempotencia de pagos, anticipos y ventas (PostgreSQL real)', () => {
+  afterAll(() => prisma.$disconnect());
+
+  it('pago: 10 peticiones simultáneas con la misma llave crean un solo pago', async () => {
+    const t = await crearTenant('pago');
+    const dto = {
+      proveedorId: t.proveedor.id,
+      puntoCompraId: t.punto.id,
+      monto: 150000,
+      metodoPago: 'EFECTIVO' as const,
+    };
+    const rs = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        t.pagos.create(t.tenant.id, t.user.id, dto, 'llave-pago-0001'),
+      ),
+    );
+    expect(new Set(rs.map((r) => r.id)).size).toBe(1);
+    expect(await prisma.pago.count({ where: { tenantId: t.tenant.id } })).toBe(
+      1,
+    );
+    await expect(
+      t.pagos.create(
+        t.tenant.id,
+        t.user.id,
+        { ...dto, monto: 1 },
+        'llave-pago-0001',
+      ),
+    ).rejects.toThrow(ConflictException);
+  }, 60_000);
+
+  it('anticipo: el reintento devuelve el mismo y no duplica; el alcance separa pagos de anticipos', async () => {
+    const t = await crearTenant('anticipo');
+    const base = {
+      proveedorId: t.proveedor.id,
+      puntoCompraId: t.punto.id,
+      monto: 200000,
+      metodoPago: 'EFECTIVO' as const,
+    };
+    const a = await t.anticipos.create(
+      t.tenant.id,
+      t.user.id,
+      base,
+      'llave-comun-xx',
+    );
+    const b = await t.anticipos.create(
+      t.tenant.id,
+      t.user.id,
+      base,
+      'llave-comun-xx',
+    );
+    expect(b.id).toBe(a.id);
+    // la misma llave en otro alcance (pago) es una operación distinta
+    const p = await t.pagos.create(
+      t.tenant.id,
+      t.user.id,
+      base,
+      'llave-comun-xx',
+    );
+    expect(p.id).not.toBe(a.id);
+    expect(
+      await prisma.anticipo.count({ where: { tenantId: t.tenant.id } }),
+    ).toBe(1);
+    expect(await prisma.pago.count({ where: { tenantId: t.tenant.id } })).toBe(
+      1,
+    );
+  });
+
+  it('venta: el reintento no duplica la venta ni la salida de inventario', async () => {
+    const t = await crearTenant('venta');
+    const rec = await t.service.create(t.tenant.id, t.user.id, t.dto(101));
+    const dto = {
+      puntoCompraId: t.punto.id,
+      tipoCafe: 'MOJADO' as const,
+      compradorNombre: 'Comprador Test',
+      cantidadKg: 40,
+      precioKg: 5000,
+      lotesOrigen: [{ recepcionId: rec.id, cantidadKgAtribuida: 40 }],
+    };
+    const a = await t.ventas.create(
+      t.tenant.id,
+      t.user.id,
+      dto,
+      'llave-venta-001',
+    );
+    const b = await t.ventas.create(
+      t.tenant.id,
+      t.user.id,
+      dto,
+      'llave-venta-001',
+    );
+    expect(b.id).toBe(a.id);
+    expect(b.codigo).toBe(a.codigo);
+    expect(await prisma.venta.count({ where: { tenantId: t.tenant.id } })).toBe(
+      1,
+    );
+    expect(
+      await prisma.movimientoInventario.count({
+        where: { tenantId: t.tenant.id, tipoMovimiento: 'SALIDA' },
+      }),
+    ).toBe(1);
   });
 });
