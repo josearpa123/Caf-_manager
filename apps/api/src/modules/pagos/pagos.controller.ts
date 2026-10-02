@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Headers,
+} from '@nestjs/common';
+import { validarLlave } from '../../prisma/idempotencia';
 import { Modulo, Permission } from '@prisma/client';
 import { PagosService } from './pagos.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
@@ -36,7 +45,13 @@ export class PagosController {
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('userId') userId: string,
     @Body() dto: CreatePagoDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.pagosService.create(tenantId, userId, dto);
+    return this.pagosService.create(
+      tenantId,
+      userId,
+      dto,
+      validarLlave(idempotencyKey),
+    );
   }
 }

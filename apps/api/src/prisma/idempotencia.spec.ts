@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import {
   buscarResultadoIdempotente,
+  ejecutarConLlave,
+  IdempotenciaDuplicada,
   hashSolicitud,
   reservarLlave,
   TTL_IDEMPOTENCIA_MS,
@@ -96,5 +98,73 @@ describe('reservarLlave', () => {
 
   it('la vigencia es de 24 horas', () => {
     expect(TTL_IDEMPOTENCIA_MS).toBe(86_400_000);
+  });
+});
+
+describe('ejecutarConLlave', () => {
+  const base = (filas: unknown[][]) => {
+    const queryRaw = jest.fn();
+    filas.forEach((f) => queryRaw.mockResolvedValueOnce(f));
+    return { $queryRaw: queryRaw, $executeRaw: jest.fn() };
+  };
+  const llamar = (
+    db: ReturnType<typeof base>,
+    llave: string | undefined,
+    ejecutar: Parameters<typeof ejecutarConLlave<string>>[0]['ejecutar'],
+  ) =>
+    ejecutarConLlave<string>({
+      db: db as never,
+      tenantId: 't1',
+      alcance: 'X',
+      llave,
+      cuerpo: { a: 1 },
+      obtener: (id) => Promise.resolve(`previo:${id}`),
+      ejecutar,
+    });
+
+  it('sin llave ejecuta con pasos que no hacen nada y no consulta la BD', async () => {
+    const db = base([]);
+    const r = await llamar(db, undefined, async (pasos) => {
+      await pasos.reservar(db as never);
+      await pasos.completar(db as never, 'id');
+      return 'nuevo';
+    });
+    expect(r).toBe('nuevo');
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('llave ya usada con el mismo cuerpo devuelve el previo sin ejecutar', async () => {
+    const db = base([
+      [{ hashSolicitud: hashSolicitud({ a: 1 }), recursoId: 'r1' }],
+    ]);
+    const ejecutar = jest.fn();
+    expect(await llamar(db, 'llave-1234', ejecutar)).toBe('previo:r1');
+    expect(ejecutar).not.toHaveBeenCalled();
+  });
+
+  it('si el servicio pierde la carrera, devuelve el documento de la ganadora', async () => {
+    const hash = hashSolicitud({ a: 1 });
+    const db = base([[], [], [{ hashSolicitud: hash, recursoId: 'ganadora' }]]);
+    const r = await llamar(db, 'llave-1234', async (pasos) => {
+      await pasos.reservar(db as never); // reservar → [] → ya existía
+      return 'no-debe-llegar';
+    });
+    expect(r).toBe('previo:ganadora');
+  });
+
+  it('si la duplicada no deja rastro, relanza el error', async () => {
+    const db = base([[], [], []]);
+    await expect(
+      llamar(db, 'llave-1234', () =>
+        Promise.reject(new IdempotenciaDuplicada()),
+      ),
+    ).rejects.toThrow(IdempotenciaDuplicada);
+  });
+
+  it('un error de negocio se propaga tal cual', async () => {
+    const db = base([[]]);
+    await expect(
+      llamar(db, 'llave-1234', () => Promise.reject(new Error('falla'))),
+    ).rejects.toThrow('falla');
   });
 });

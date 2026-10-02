@@ -4,6 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { MetodoPago, Prisma } from '@prisma/client';
+import {
+  ejecutarConLlave,
+  type PasosIdempotencia,
+} from '../../prisma/idempotencia';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { CreatePagoDto } from './dto/create-pago.dto';
@@ -14,6 +18,8 @@ const PAGO_LIST_INCLUDE = {
   puntoCompra: { select: { nombre: true } },
   recepcion: { select: { codigo: true } },
 } as const;
+
+const ALCANCE_IDEMPOTENCIA = 'PAGO';
 
 @Injectable()
 export class PagosService {
@@ -46,7 +52,9 @@ export class PagosService {
       include: {
         ...PAGO_LIST_INCLUDE,
         conciliaciones: {
-          include: { anticipo: { select: { id: true, fecha: true, monto: true } } },
+          include: {
+            anticipo: { select: { id: true, fecha: true, monto: true } },
+          },
         },
       },
     });
@@ -77,7 +85,31 @@ export class PagosService {
       throw new BadRequestException('El punto de compra está inactivo');
   }
 
-  async create(tenantId: string, createdById: string, dto: CreatePagoDto) {
+  // Con `llave` (encabezado Idempotency-Key) un reintento no duplica el pago
+  // (regla de dominio 6, ADR-007).
+  create(
+    tenantId: string,
+    createdById: string,
+    dto: CreatePagoDto,
+    llave?: string,
+  ) {
+    return ejecutarConLlave({
+      db: this.prisma,
+      tenantId,
+      alcance: ALCANCE_IDEMPOTENCIA,
+      llave,
+      cuerpo: dto,
+      obtener: (id) => this.findOne(id),
+      ejecutar: (pasos) => this.crear(tenantId, createdById, dto, pasos),
+    });
+  }
+
+  private async crear(
+    tenantId: string,
+    createdById: string,
+    dto: CreatePagoDto,
+    pasos: PasosIdempotencia,
+  ) {
     await this.assertProveedorActivo(dto.proveedorId);
     await this.assertPuntoCompraActivo(dto.puntoCompraId);
 
@@ -95,20 +127,25 @@ export class PagosService {
         );
     }
 
-    return this.prisma.pago.create({
-      data: {
-        tenantId,
-        proveedorId: dto.proveedorId,
-        puntoCompraId: dto.puntoCompraId,
-        recepcionId: dto.recepcionId,
-        monto: dto.monto,
-        metodoPago: dto.metodoPago,
-        referencia: dto.referencia,
-        numeroCheque: dto.numeroCheque,
-        notas: dto.notas,
-        createdById,
-      },
-      include: PAGO_LIST_INCLUDE,
+    return this.prisma.$transaction(async (tx) => {
+      await pasos.reservar(tx);
+      const pago = await tx.pago.create({
+        data: {
+          tenantId,
+          proveedorId: dto.proveedorId,
+          puntoCompraId: dto.puntoCompraId,
+          recepcionId: dto.recepcionId,
+          monto: dto.monto,
+          metodoPago: dto.metodoPago,
+          referencia: dto.referencia,
+          numeroCheque: dto.numeroCheque,
+          notas: dto.notas,
+          createdById,
+        },
+        include: PAGO_LIST_INCLUDE,
+      });
+      await pasos.completar(tx, pago.id);
+      return pago;
     });
   }
 

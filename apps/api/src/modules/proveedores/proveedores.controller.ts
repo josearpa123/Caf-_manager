@@ -16,6 +16,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateProveedorDto } from './dto/create-proveedor.dto';
 import { UpdateProveedorDto } from './dto/update-proveedor.dto';
 import { QueryProveedoresDto } from './dto/query-proveedores.dto';
+import { BuscarProveedoresDto } from './dto/buscar-proveedores.dto';
 
 @Controller('proveedores')
 @RequireModulo(Modulo.PROVEEDORES)
@@ -26,6 +27,16 @@ export class ProveedoresController {
   @Get()
   findAll(@Query() query: QueryProveedoresDto) {
     return this.proveedoresService.findAll(query);
+  }
+
+  // Antes de ':id' para que 'buscar' no se tome como un id.
+  @RequirePermissions(Permission.PROVEEDORES_VER)
+  @Get('buscar')
+  buscar(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query() query: BuscarProveedoresDto,
+  ) {
+    return this.proveedoresService.buscar(tenantId, query);
   }
 
   @RequirePermissions(Permission.PROVEEDORES_VER)

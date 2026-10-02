@@ -4,6 +4,36 @@
 
 **Última actualización:** 2026-10-01
 
+## Sprint 1 · PR 3 — búsqueda de proveedor con pg_trgm (sesión 2026-10-01)
+
+Rama `feat/busqueda-proveedor`, apilada sobre `feat/idempotencia-pagos-ventas` (PR #5).
+
+- **Cubre**: RF-02, RNF-01 (búsqueda < 300 ms), CU-01 paso 2–3 (backend).
+- **Schema**: migración aditiva `20261001130000_proveedor_apodo_busqueda` (`CREATE EXTENSION pg_trgm`, `Proveedor.apodo`, 3 índices GIN de trigramas); aplicada a las BD de desarrollo y de pruebas; `migrate diff` sin deriva.
+- **API**: `GET /proveedores/buscar?q=&limit=` (top 10, tope 20; activos del tenant; cédula que empieza igual primero, luego parecido; tolera errores de digitación; devuelve `ultimoTipoCafe`). `apodo` en crear/editar y en el filtro `q` del listado. Detalle y razones en `docs/adr/008-busqueda-proveedor-trigramas.md`. **Decisión mía (reversible)**: endpoint nuevo en vez de cambiar la forma de `GET /proveedores` para no romper la web actual.
+- **Pruebas**: 8 unitarias (escape de comodines, límites, tenant) y 7 de integración con PostgreSQL real (parcial/apodo/cédula, errores de digitación, orden, aislamiento por tenant, comodines, último tipo de café, 5.000 proveedores < 300 ms). API: 127 unitarias y 30 de integración en verde; lint de lo tocado y build limpios.
+- **Medido**: 9–18 ms con 5.000 proveedores en un tenant; a esa escala el planificador usa el índice por tenant, no los de trigramas (ver ADR-008).
+- **`unaccent`** (migración `20261001140000_unaccent`, pedido del usuario): la búsqueda ignora tildes en ambos sentidos. Costo: esas comparaciones no usan los índices GIN de columna cruda (ver ADR-008). 8 unitarias y 31 de integración en verde.
+- **Se corrigió por el camino**: un escape de `LIKE` mal escrito por mí (la prueba unitaria lo atrapó antes del commit).
+
+### Pendiente / fuera de alcance
+- La web (pantalla de recepción rápida) aún no usa el endpoint ni envía `Idempotency-Key`.
+- El formulario de proveedores de la web no tiene campo `apodo` todavía.
+
+## Sprint 1 · PR 2 — idempotencia en pagos, anticipos y ventas (sesión 2026-10-01)
+
+Rama `feat/idempotencia-pagos-ventas`, apilada sobre `feat/idempotencia` (PR #4); retargetear a `main` cuando #4 se fusione.
+
+- **Cubre**: regla de dominio 6 completa para recepción, pago, anticipo y venta (H7).
+- **Código**: `ejecutarConLlave` en `apps/api/src/prisma/idempotencia.ts` encapsula búsqueda previa, 409, reserva y carrera; recepción pasó a usarlo (sin cambio de comportamiento) y se enganchó a `POST /pagos`, `POST /anticipos` y `POST /ventas` con el encabezado `Idempotency-Key` (alcances `PAGO`, `ANTICIPO`, `VENTA`; la llave es por alcance, la misma llave en otro alcance es otra operación).
+- **Cambio de comportamiento**: crear un pago o anticipo ahora ocurre dentro de `$transaction` (antes era un `create` suelto), necesario para reservar la llave en la misma transacción. Sin llave el resultado es el mismo.
+- **Pruebas**: unitarias del envoltorio (5), de pagos (4) y anticipos (4); integración con PostgreSQL real: 10 pagos simultáneos con la misma llave → uno solo, 409 con otro monto, alcance separado pago/anticipo, venta que no duplica el movimiento de salida. API: 119 unitarias y 23 de integración en verde.
+- **Conciliaciones** (`ConciliacionesService.create`) no se tocó: no mueve plata nueva, y ya tiene la carrera de sobre-aplicación anotada en el Sprint 0 PR 3; se resuelve junto con su transacción/bloqueo.
+
+### Pendiente / fuera de alcance
+- La web debe enviar `Idempotency-Key` en estas cuatro operaciones (pantalla de recepción rápida y formularios de pagos/ventas).
+- Contratos de venta, préstamos, abonos, secado y trilla no la aceptan aún (no son escrituras de plata directas o van en su propio PR).
+
 ## Sprint 1 · PR 1 — idempotencia en recepciones, cierra H7 en el backend (sesión 2026-10-01)
 
 Rama `feat/idempotencia` (sobre `main` de GitHub, PR #2 ya fusionado).

@@ -1,10 +1,17 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { MetodoPago } from '@prisma/client';
+import { hashSolicitud } from '../../prisma/idempotencia';
 import { PagosService } from './pagos.service';
 
 function build() {
-  const prisma = {
+  const prisma: Record<string, any> = {
+    $queryRaw: jest.fn().mockResolvedValue([{ llave: 'llave-1234' }]),
+    $executeRaw: jest.fn().mockResolvedValue(1),
     pago: {
       findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn(),
@@ -24,6 +31,7 @@ function build() {
     conciliacionAnticipo: { findMany: jest.fn().mockResolvedValue([]) },
     prestamo: { findMany: jest.fn().mockResolvedValue([]) },
   };
+  prisma.$transaction = jest.fn((fn: (t: unknown) => unknown) => fn(prisma));
   return { service: new PagosService(prisma as never), prisma };
 }
 
@@ -254,6 +262,50 @@ describe('PagosService', () => {
       const r = await service.estadoCuenta('p1');
       expect(r.saldoPendienteEstimado).toBe(100000);
       expect(r.saldoNeto).toBe(-200000);
+    });
+  });
+
+  describe('create · idempotencia (Idempotency-Key)', () => {
+    it('sin llave no toca la tabla de llaves', async () => {
+      const { service, prisma } = build();
+      await service.create('t1', 'u1', dto);
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('llave nueva: reserva, crea y completa con el id del pago', async () => {
+      const { service, prisma } = build();
+      prisma.$queryRaw
+        .mockResolvedValueOnce([]) // buscar: llave nueva
+        .mockResolvedValueOnce([{ llave: 'llave-1234' }]); // reservar
+      await service.create('t1', 'u1', dto, 'llave-1234');
+      expect(prisma.pago.create).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw.mock.calls[0]).toContain('pago-1');
+    });
+
+    it('reintento: devuelve el pago previo sin crear otro', async () => {
+      const { service, prisma } = build();
+      prisma.$queryRaw.mockResolvedValueOnce([
+        { hashSolicitud: hashSolicitud(dto), recursoId: 'pago-1' },
+      ]);
+      prisma.pago.findUnique.mockResolvedValue({ id: 'pago-1' });
+      const r = await service.create('t1', 'u1', dto, 'llave-1234');
+      expect(r).toEqual({ id: 'pago-1' });
+      expect(prisma.pago.create).not.toHaveBeenCalled();
+    });
+
+    it('misma llave con otro monto → 409', async () => {
+      const { service, prisma } = build();
+      prisma.$queryRaw.mockResolvedValueOnce([
+        {
+          hashSolicitud: hashSolicitud({ ...dto, monto: 1 }),
+          recursoId: 'pago-1',
+        },
+      ]);
+      await expect(
+        service.create('t1', 'u1', dto, 'llave-1234'),
+      ).rejects.toThrow(ConflictException);
+      expect(prisma.pago.create).not.toHaveBeenCalled();
     });
   });
 });

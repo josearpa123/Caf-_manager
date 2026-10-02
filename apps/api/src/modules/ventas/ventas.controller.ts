@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Headers,
+} from '@nestjs/common';
+import { validarLlave } from '../../prisma/idempotencia';
 import { Modulo, Permission } from '@prisma/client';
 import { VentasService } from './ventas.service';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
@@ -30,7 +39,13 @@ export class VentasController {
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('userId') userId: string,
     @Body() dto: CreateVentaDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.ventasService.create(tenantId, userId, dto);
+    return this.ventasService.create(
+      tenantId,
+      userId,
+      dto,
+      validarLlave(idempotencyKey),
+    );
   }
 }
