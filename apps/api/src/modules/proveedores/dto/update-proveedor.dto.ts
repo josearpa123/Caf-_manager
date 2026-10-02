@@ -16,6 +16,10 @@ export class UpdateProveedorDto {
 
   @IsOptional()
   @IsString()
+  apodo?: string;
+
+  @IsOptional()
+  @IsString()
   telefono?: string;
 
   @IsOptional()

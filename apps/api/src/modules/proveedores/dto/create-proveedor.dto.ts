@@ -13,6 +13,11 @@ export class CreateProveedorDto {
   @IsNotEmpty()
   nombre: string;
 
+  // Cómo le dicen en el pueblo; se busca junto con el nombre y la cédula.
+  @IsOptional()
+  @IsString()
+  apodo?: string;
+
   @IsOptional()
   @IsString()
   telefono?: string;
