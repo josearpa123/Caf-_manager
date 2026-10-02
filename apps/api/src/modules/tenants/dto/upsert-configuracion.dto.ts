@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsPositive } from 'class-validator';
+import { IsBoolean, IsNumber, IsOptional, IsPositive } from 'class-validator';
 
 export class UpsertConfiguracionDto {
   @IsNumber()
@@ -24,4 +24,9 @@ export class UpsertConfiguracionDto {
   @IsNumber()
   @IsPositive()
   taraPorSacoKg?: number;
+
+  // Si es true, las compras de café pergamino o mojado retienen en la fuente.
+  @IsOptional()
+  @IsBoolean()
+  esAgenteRetencion?: boolean;
 }

@@ -479,6 +479,7 @@ model ConfiguracionTenant {
   rendimientoMaxAceptable Decimal? @db.Decimal(6, 2)
   saldoProveedorUmbral    Decimal? @db.Decimal(14, 2) // dispara notificación de saldo alto
   taraPorSacoKg           Decimal? @db.Decimal(6, 3) // peso del saco vacío; tara = sacos × este valor
+  esAgenteRetencion       Boolean  @default(false) // si es true, las compras de café retienen en la fuente
   updatedAt               DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -565,6 +566,13 @@ model Recepcion {
   tablaPrecioTramoId String? // null para PASILLA (precio directo)
   precioKg           Decimal @db.Decimal(12, 2) // copiado/inmutable al momento de la transacción
   valorTotal         Decimal @db.Decimal(14, 2)
+
+  // Retención en la fuente, copiada e inmutable al guardar (regla 3, ADR-009).
+  // baseRetencion/tarifaRetencion son null si no se retuvo; valorRetencion es 0.
+  baseRetencion   Decimal? @db.Decimal(14, 2)
+  tarifaRetencion Decimal? @db.Decimal(7, 6)
+  valorRetencion  Decimal  @default(0) @db.Decimal(14, 2)
+  netoPagar       Decimal? @db.Decimal(14, 2) // valorTotal - valorRetencion
 
   // Solo aplica cuando tipoCafe = PASILLA
   destinoPasilla       DestinoPasilla?
@@ -1160,4 +1168,24 @@ model IdempotencyKey {
 
   @@id([tenantId, alcance, llave])
   @@index([expiraEn])
+}
+
+enum ConceptoTributario {
+  RETENCION_COMPRA_CAFE
+}
+
+// Parámetros tributarios globales de la plataforma, con vigencia por fecha
+// (regla 7): nunca valores fijos en el código. Se usa la fila más reciente con
+// vigenteDesde <= fecha de la recepción. Sin tenantId a propósito (ADR-009).
+model ParametroTributario {
+  id           String             @id @default(cuid())
+  concepto     ConceptoTributario
+  vigenteDesde DateTime           @db.Date
+  valorUvt     Decimal            @db.Decimal(12, 2) // pesos por UVT
+  umbralUvt    Decimal            @db.Decimal(8, 2) // base mínima en UVT
+  tarifa       Decimal            @db.Decimal(7, 6) // 0.005 = 0,5 %
+  norma        String?
+  createdAt    DateTime           @default(now())
+
+  @@unique([concepto, vigenteDesde])
 }

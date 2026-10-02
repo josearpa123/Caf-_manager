@@ -12,6 +12,7 @@ interface ConfiguracionTenant {
   humedadMinAceptable: string | number;
   humedadMaxAceptable: string | number;
   taraPorSacoKg: string | number | null;
+  esAgenteRetencion: boolean;
 }
 
 const num = (texto: string) => {
@@ -26,6 +27,7 @@ export function RecepcionConfig() {
   const [taraPorSaco, setTaraPorSaco] = useState('');
   const [humedadMin, setHumedadMin] = useState('10');
   const [humedadMax, setHumedadMax] = useState('12');
+  const [esAgente, setEsAgente] = useState(false);
   const [mensaje, setMensaje] = useState<{ ok: boolean; texto: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -37,6 +39,7 @@ export function RecepcionConfig() {
           setHumedadMin(String(Number(c.humedadMinAceptable)));
           setHumedadMax(String(Number(c.humedadMaxAceptable)));
           setTaraPorSaco(c.taraPorSacoKg ? String(Number(c.taraPorSacoKg)) : '');
+          setEsAgente(c.esAgenteRetencion);
         }
       })
       .catch(() => {})
@@ -59,6 +62,7 @@ export function RecepcionConfig() {
         taraPorSacoKg: tara,
         humedadMinAceptable: min,
         humedadMaxAceptable: max,
+        esAgenteRetencion: esAgente,
       });
       setMensaje({ ok: true, texto: 'Guardado' });
     } catch (err) {
@@ -113,6 +117,25 @@ export function RecepcionConfig() {
                 disabled={!cargado}
               />
             </div>
+          </div>
+          <div className="flex flex-col gap-1.5 rounded-md border p-3">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={esAgente}
+                onChange={(e) => setEsAgente(e.target.checked)}
+                disabled={!cargado}
+                className="mt-1 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]"
+              />
+              <span>
+                <span className="block text-sm font-medium">Soy agente de retención en la fuente</span>
+                <span className="block text-xs text-muted-foreground">
+                  Si lo activas, cada compra de café pergamino o mojado cuyo valor llegue a la base mínima
+                  (70 UVT) retiene el 0,5 % y se muestra el neto a pagar. La base, la tarifa y la UVT
+                  vigentes las mantiene la plataforma. Confírmalo con tu contador.
+                </span>
+              </span>
+            </label>
           </div>
           {mensaje && (
             <p

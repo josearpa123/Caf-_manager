@@ -88,6 +88,18 @@ describe('siguienteConsecutivo (PostgreSQL real)', () => {
     expect(await siguiente(a.tenant.id, 'RECEPCION')).toBe('REC-2026-000003');
   });
 
+  it('el año es el de Colombia: 31-dic a las 8 p. m. hora Bogotá sigue siendo ese año', async () => {
+    const { tenant } = await crearTenant('anio-colombia');
+    // 2027-01-01T03:00Z = 31-dic-2026 10 p. m. en Bogotá
+    expect(
+      await siguiente(tenant.id, 'RECEPCION', new Date('2027-01-01T03:00:00Z')),
+    ).toBe('REC-2026-000001');
+    // 2027-01-01T05:00Z = 1-ene-2027 12 a. m. en Bogotá
+    expect(
+      await siguiente(tenant.id, 'RECEPCION', new Date('2027-01-01T05:00:00Z')),
+    ).toBe('REC-2027-000001');
+  });
+
   it('dentro de una transacción que luego falla deja hueco, no repite', async () => {
     const { tenant } = await crearTenant('rollback');
     await expect(

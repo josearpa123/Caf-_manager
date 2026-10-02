@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { diaColombia, isoDiaColombia } from '../../common/fecha-colombia';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { CreateTablaPrecioTramoDto } from './dto/create-tabla-precio-tramo.dto';
@@ -6,7 +7,7 @@ import { QueryTablaPreciosDto } from './dto/query-tabla-precios.dto';
 import { QueryPrecioVigenteDto } from './dto/query-precio-vigente.dto';
 
 function parseFechaOnly(fecha?: string): Date {
-  const iso = fecha ?? new Date().toISOString().slice(0, 10);
+  const iso = fecha ?? isoDiaColombia();
   return new Date(`${iso.slice(0, 10)}T00:00:00.000Z`);
 }
 
@@ -39,7 +40,7 @@ export class TablaPreciosService {
   // duplica la lógica de precios; el valor que manda es el del servidor al guardar.
   async precioVigente(query: QueryPrecioVigenteDto) {
     const tramo = await this.findMatch({
-      fecha: new Date(),
+      fecha: diaColombia(),
       puntoCompraId: query.puntoCompraId,
       humedad: query.humedad,
       factorRendimiento: query.factorRendimiento,

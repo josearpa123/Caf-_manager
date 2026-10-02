@@ -13,6 +13,7 @@ import type {
   PrecioVigente,
   ProveedorCoincidencia,
   RecepcionContexto,
+  RetencionPrevia,
 } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -103,6 +104,8 @@ interface RecepcionCreada {
   pesoNeto: string | number;
   precioKg: string | number;
   valorTotal: string | number;
+  valorRetencion: string | number;
+  netoPagar: string | number | null;
 }
 
 export default function RecepcionRapidaPage() {
@@ -134,6 +137,7 @@ export default function RecepcionRapidaPage() {
   const [precioDirecto, setPrecioDirecto] = useState('');
 
   const [precio, setPrecio] = useState<PrecioVigente | null | 'cargando'>(null);
+  const [retencion, setRetencion] = useState<RetencionPrevia | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [creada, setCreada] = useState<RecepcionCreada | null>(null);
@@ -203,6 +207,27 @@ export default function RecepcionRapidaPage() {
     tipo === 'PERGAMINO' ? (precio && precio !== 'cargando' ? precio.precioKg : NaN) : num(precioDirecto);
   const valorTotal = Number.isFinite(neto) && Number.isFinite(precioKg) ? redondear2(neto * precioKg) : NaN;
 
+  // Retención en vivo (solo si el negocio es agente): misma regla del guardado.
+  const aplicaRetencion = !!ctx?.esAgenteRetencion && tipo !== 'PASILLA';
+  useEffect(() => {
+    if (!aplicaRetencion || !Number.isFinite(valorTotal) || valorTotal <= 0) {
+      setRetencion(null);
+      return;
+    }
+    let vigente = true;
+    const t = setTimeout(() => {
+      const qs = new URLSearchParams({ tipoCafe: tipo, valorTotal: String(valorTotal) });
+      api
+        .get<RetencionPrevia>(`/recepcion/retencion?${qs}`)
+        .then((r) => vigente && setRetencion(r))
+        .catch(() => vigente && setRetencion(null));
+    }, 250);
+    return () => {
+      vigente = false;
+      clearTimeout(t);
+    };
+  }, [aplicaRetencion, tipo, valorTotal]);
+
   // ── Enter avanza al siguiente campo; en el último, guarda ──
   const onFormKeyDown = (e: KeyboardEvent<HTMLFormElement>) => {
     if (e.key !== 'Enter') return;
@@ -240,6 +265,7 @@ export default function RecepcionRapidaPage() {
     setFactorManual('');
     setPrecioDirecto('');
     setPrecio(null);
+    setRetencion(null);
     setError(null);
     setCreada(null);
     intento.current = null;
@@ -350,6 +376,18 @@ export default function RecepcionRapidaPage() {
               <dd className="font-semibold">{COP.format(Number(creada.valorTotal))}</dd>
             </div>
           </dl>
+          {Number(creada.valorRetencion) > 0 && (
+            <dl className="mt-3 grid grid-cols-2 gap-3 border-t pt-3 text-sm">
+              <div>
+                <dt className="text-muted-foreground">Retención en la fuente</dt>
+                <dd className="font-medium">{COP.format(Number(creada.valorRetencion))}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Neto a pagar</dt>
+                <dd className="text-lg font-semibold">{COP.format(Number(creada.netoPagar))}</dd>
+              </div>
+            </dl>
+          )}
           <div className="mt-5 flex flex-wrap gap-2">
             <Button ref={nuevaRef} type="button" size="lg" onClick={reiniciar} className="h-12 flex-1">
               Nueva recepción
@@ -572,6 +610,20 @@ export default function RecepcionRapidaPage() {
               </p>
             </div>
           </div>
+          {retencion?.aplica && (
+            <div className="mt-3 grid grid-cols-2 gap-3 border-t pt-3 text-sm">
+              <div>
+                <p className="text-muted-foreground">
+                  Retención ({(Number(retencion.tarifaRetencion) * 100).toLocaleString('es-CO')} %)
+                </p>
+                <p className="text-lg font-semibold">{COP.format(Number(retencion.valorRetencion))}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Neto a pagar</p>
+                <p className="text-lg font-semibold">{COP.format(Number(retencion.netoPagar))}</p>
+              </div>
+            </div>
+          )}
           {tipo === 'PERGAMINO' && precio === null && Number.isFinite(factor) && Number.isFinite(humedadNum) && (
             <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
               No hay tramo de precio para esta calidad. Registra el precio del día en Precios.

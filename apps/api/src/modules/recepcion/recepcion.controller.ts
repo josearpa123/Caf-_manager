@@ -15,6 +15,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateRecepcionDto } from './dto/create-recepcion.dto';
 import { validarLlave } from '../../prisma/idempotencia';
 import { QueryRecepcionesDto } from './dto/query-recepciones.dto';
+import { QueryRetencionDto } from './dto/query-retencion.dto';
 
 @Controller('recepcion')
 @RequireModulo(Modulo.RECEPCION)
@@ -34,6 +35,16 @@ export class RecepcionController {
   @Get('contexto')
   contexto(@CurrentUser('puntoCompraId') puntoCompraId: string | null) {
     return this.recepcionService.contexto(puntoCompraId);
+  }
+
+  // Vista previa de la retención con la misma regla del guardado.
+  @RequirePermissions(Permission.RECEPCION_CREAR)
+  @Get('retencion')
+  retencion(@Query() query: QueryRetencionDto) {
+    return this.recepcionService.previsualizarRetencion(
+      query.tipoCafe,
+      query.valorTotal,
+    );
   }
 
   @RequirePermissions(Permission.RECEPCION_VER)

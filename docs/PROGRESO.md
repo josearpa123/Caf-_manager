@@ -4,6 +4,25 @@
 
 **Última actualización:** 2026-10-01
 
+## Sprint 2 · PR 1 — zona horaria de Colombia y retención en la fuente, cierra H5 (sesión 2026-10-01)
+
+Rama `feat/zona-horaria-y-retencion`, apilada sobre `feat/recepcion-rapida-web` (PR #8). Decisiones del usuario: zona horaria fija America/Bogota; retención opcional (la activa el comprador en Configuración) y solo por recepción; **yo investigo y aplico los valores tributarios**. Detalle en `docs/adr/009-zona-horaria-y-retencion.md`.
+
+- **Cubre**: H5, RF-09, CU-03, regla 7; arregla el hallazgo del Sprint 1 (sin precio después de las 7 p. m.).
+- **Zona horaria**: `src/common/fecha-colombia.ts` (`diaColombia`, `anioColombia`) aplicado a la búsqueda del tramo de precios (guardado, vista previa y listado), el año del consecutivo y la vigencia del parámetro tributario. Confirmado en vivo: el tramo de la BD local estaba sembrado con el día UTC y ya no coincidía con el día de Bogotá.
+- **Valores tributarios verificados** (no de memoria; dos fuentes independientes cada uno): UVT 2026 = $52.374 (Resolución DIAN 000238 de 2025); café pergamino o cereza = 0,5 % desde 70 UVT = $3.666.180 (Decreto 1625 de 2016), sin cambio con el Decreto 572 vigente desde el 1-jul-2026. Fuentes: gerencie.com (tabla 2026), UPTC (tabla 2026), buk.co y ámbito jurídico (UVT), Infobae (Decreto 572).
+- **Schema** (migración `20261002000000_retencion_y_parametros_tributarios`, aditiva): `ConfiguracionTenant.esAgenteRetencion` (false), `Recepcion.baseRetencion/tarifaRetencion/valorRetencion/netoPagar` (backfill: retención 0, neto = total), tabla `ParametroTributario` con la fila 2026 sembrada.
+- **Cálculo** (`recepcion/retencion.ts`, `Prisma.Decimal`): "a partir de" el umbral (en 70 UVT exactos sí retiene), a centavos mitad hacia arriba; aplica a pergamino y mojado, **no a pasilla** (interpretación a confirmar con el contador, una línea para cambiarla). Agente sin parámetro vigente → 400, no inventa. Los cuatro campos se copian e inmutan al guardar.
+- **API**: `GET /recepcion/retencion` (vista previa con la misma regla), `esAgenteRetencion` en el contexto y en `PATCH /tenants/me/configuracion`.
+- **Web**: casilla "Soy agente de retención en la fuente" en Configuración; la pantalla rápida muestra retención y neto a pagar en vivo y en el resultado cuando aplica.
+- **Pruebas**: 7 del cálculo (borde exacto, redondeo, sin flotantes), 8 del servicio (agente, bajo umbral, no agente, pasilla, sin parámetro, día de Bogotá, vista previa) y 3 de zona horaria; integración con PostgreSQL real: retención de punta a punta con la fila sembrada, inmutabilidad, año del consecutivo el 31-dic. API: 160 unitarias aprox. y 38 de integración; lint y build limpios. Navegador (390 px): $4.300.000 → retención $21.500 → neto $4.278.500 y sin retención al desactivar (REC-2026-000021 en la BD local; la opción quedó desactivada).
+
+### Pendiente / fuera de alcance
+- **Cada diciembre**: cargar la UVT del año siguiente en `ParametroTributario` (sin pantalla de super-admin todavía; hoy con SQL/migración).
+- Confirmar con un contador: pasilla sin retención, redondeo por transacción y que no se acumule por proveedor.
+- Reportes agrupan en UTC (una compra de las 8 p. m. cuenta para el día siguiente): migrar a `diaColombia`.
+- Anulación (RF-07/08), pago en el mismo paso (RF-10) y recibo térmico/compartir (RF-06): siguientes PR del Sprint 2. El recibo debe imprimir base, tarifa, retención y neto.
+
 ## Sprint 1 · PR 5 — pantalla de recepción rápida, cierra H3 en código (sesión 2026-10-01)
 
 Rama `feat/recepcion-rapida-web`, apilada sobre `feat/recepcion-rapida-backend` (PR #7). Captura: `docs/img/recepcion-rapida-movil.png` (datos ficticios de la simulación).

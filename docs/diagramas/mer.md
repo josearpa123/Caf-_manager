@@ -1,6 +1,6 @@
 # Modelo entidad-relación completo
 
-Generado desde `apps/api/prisma/schema.prisma` (35 tablas actuales + 2 propuestas: `ParametroTributario`, `Finca`). Regenerar cada vez que cambie el schema. Fuente: `docs/TECNICO.md` (anexo).
+Generado desde `apps/api/prisma/schema.prisma` (36 tablas actuales + 1 propuesta: `Finca`). Regenerar cada vez que cambie el schema. Fuente: `docs/TECNICO.md` (anexo).
 
 ```mermaid
 erDiagram
@@ -188,7 +188,10 @@ erDiagram
     string tablaPrecioTramoId FK
     decimal precioKg
     decimal valorTotal
+    decimal baseRetencion
+    decimal tarifaRetencion
     decimal valorRetencion
+    decimal netoPagar
     EstadoRecepcion estado
     string decididoPorId FK
     string createdById FK
@@ -369,6 +372,7 @@ erDiagram
     decimal valorUvt
     decimal umbralUvt
     decimal tarifa
+    string norma
   }
   Finca {
     string id PK

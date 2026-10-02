@@ -1,4 +1,5 @@
 import { Prisma, TipoConsecutivo } from '@prisma/client';
+import { anioColombia } from '../common/fecha-colombia';
 
 // Prefijo del código por tipo de documento (ej. REC-2026-000123).
 export const PREFIJO_CONSECUTIVO: Record<TipoConsecutivo, string> = {
@@ -42,7 +43,7 @@ export async function siguienteConsecutivo(
   tipo: TipoConsecutivo,
   fecha: Date,
 ): Promise<string> {
-  const anio = fecha.getUTCFullYear();
+  const anio = anioColombia(fecha);
   const prefijo = PREFIJO_CONSECUTIVO[tipo];
   const filas = await tx.$queryRaw<{ valorActual: number }[]>`
     INSERT INTO "Consecutivo" ("tenantId", "tipo", "anio", "prefijo", "valorActual", "updatedAt")

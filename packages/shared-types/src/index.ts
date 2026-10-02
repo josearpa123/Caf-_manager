@@ -166,6 +166,18 @@ export interface RecepcionContexto {
   puntosCompra: { id: string; nombre: string }[];
   puntoCompraIdPorDefecto: string | null;
   taraPorSacoKg: number | null;
+  // Si es true, las compras de pergamino y mojado retienen en la fuente.
+  esAgenteRetencion: boolean;
+}
+
+// GET /recepcion/retencion: vista previa con la misma regla del guardado.
+// Los montos llegan como texto decimal exacto.
+export interface RetencionPrevia {
+  aplica: boolean;
+  umbralPesos: string;
+  tarifaRetencion: string | null;
+  valorRetencion: string;
+  netoPagar: string;
 }
 
 // GET /tabla-precios/precio: null si no hay tramo para esa calidad.
