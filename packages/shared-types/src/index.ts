@@ -148,12 +148,54 @@ export const CategoriaDefecto = {
 export type CategoriaDefecto =
   (typeof CategoriaDefecto)[keyof typeof CategoriaDefecto];
 
+// Resultado de GET /proveedores/buscar (recepción rápida).
+export interface ProveedorCoincidencia {
+  id: string;
+  nombre: string;
+  apodo: string | null;
+  tipoIdentificacion: TipoIdentificacion;
+  numeroIdentificacion: string;
+  telefono: string | null;
+  municipio: string | null;
+  // Tipo de café de su última recepción; null si nunca ha vendido.
+  ultimoTipoCafe: 'MOJADO' | 'PERGAMINO' | 'PASILLA' | null;
+}
+
+// GET /recepcion/contexto: lo necesario para abrir la recepción rápida.
+export interface RecepcionContexto {
+  puntosCompra: { id: string; nombre: string }[];
+  puntoCompraIdPorDefecto: string | null;
+  taraPorSacoKg: number | null;
+  // Si es true, las compras de pergamino y mojado retienen en la fuente.
+  esAgenteRetencion: boolean;
+  // Forma habitual de comprar café seco en este negocio.
+  modoCompraPergamino: 'CALIDAD' | 'PRECIO_DIRECTO';
+}
+
+// GET /recepcion/retencion: vista previa con la misma regla del guardado.
+// Los montos llegan como texto decimal exacto.
+export interface RetencionPrevia {
+  aplica: boolean;
+  umbralPesos: string;
+  tarifaRetencion: string | null;
+  valorRetencion: string;
+  netoPagar: string;
+}
+
+// GET /tabla-precios/precio: null si no hay tramo para esa calidad.
+export interface PrecioVigente {
+  tramoId: string;
+  nombre: string | null;
+  precioKg: number;
+}
+
 export interface Proveedor {
   id: string;
   tenantId: string;
   tipoIdentificacion: TipoIdentificacion;
   numeroIdentificacion: string;
   nombre: string;
+  apodo: string | null;
   telefono: string | null;
   whatsapp: string | null;
   vereda: string | null;

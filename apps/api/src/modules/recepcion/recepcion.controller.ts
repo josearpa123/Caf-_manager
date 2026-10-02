@@ -15,6 +15,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateRecepcionDto } from './dto/create-recepcion.dto';
 import { validarLlave } from '../../prisma/idempotencia';
 import { QueryRecepcionesDto } from './dto/query-recepciones.dto';
+import { QueryRetencionDto } from './dto/query-retencion.dto';
 
 @Controller('recepcion')
 @RequireModulo(Modulo.RECEPCION)
@@ -25,6 +26,25 @@ export class RecepcionController {
   @Get()
   findAll(@Query() query: QueryRecepcionesDto) {
     return this.recepcionService.findAll(query);
+  }
+
+  // Todo lo que la pantalla de recepción rápida necesita al abrir, para que el
+  // operador no requiera permisos de configuración ni de puntos de compra.
+  // Antes de ':id' para que 'contexto' no se tome como un id.
+  @RequirePermissions(Permission.RECEPCION_CREAR)
+  @Get('contexto')
+  contexto(@CurrentUser('puntoCompraId') puntoCompraId: string | null) {
+    return this.recepcionService.contexto(puntoCompraId);
+  }
+
+  // Vista previa de la retención con la misma regla del guardado.
+  @RequirePermissions(Permission.RECEPCION_CREAR)
+  @Get('retencion')
+  retencion(@Query() query: QueryRetencionDto) {
+    return this.recepcionService.previsualizarRetencion(
+      query.tipoCafe,
+      query.valorTotal,
+    );
   }
 
   @RequirePermissions(Permission.RECEPCION_VER)

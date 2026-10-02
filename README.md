@@ -84,7 +84,7 @@ El plan completo (requisitos RF/RNF, casos de uso, modelo de datos, sprints y ha
 | H2 | Sin pruebas de los cálculos de plata | ✅ Cerrado (sprint 0) |
 | H3 | Formulario de recepción lento (9+ campos sin valores por defecto) | Sprint 1 |
 | H4 | No se puede anular una recepción | Sprint 2 |
-| H5 | Sin retención en la fuente | Sprint 2 |
+| H5 | Sin retención en la fuente | Sprint 2 (hecho, opcional por negocio) |
 | H6 | Sin cola de trabajos (PDF, WhatsApp, DIAN en la petición) | Sprint 3 |
 | H7 | Sin idempotencia en `POST /recepciones` | Sprint 1 (backend hecho; falta la web) |
 | H8 | "Factura" por recepción; debe ser documento soporte | Fase 2 |

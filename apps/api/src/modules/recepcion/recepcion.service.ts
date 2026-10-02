@@ -11,6 +11,12 @@ import {
   TipoInventario,
   TipoMovimientoInventario,
 } from '@prisma/client';
+import { diaColombia } from '../../common/fecha-colombia';
+import {
+  calcularRetencion,
+  TIPOS_CON_RETENCION,
+  type ResultadoRetencion,
+} from './retencion';
 import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import {
   ejecutarConLlave,
@@ -57,6 +63,12 @@ const INVENTARIO_POR_TIPO: Record<TipoCafeRecepcion, TipoInventario> = {
   [TipoCafeRecepcion.PASILLA]: TipoInventario.PASILLA,
 };
 
+// Lo que la recepción lee de ConfiguracionTenant.
+type ConfigRecepcion = {
+  taraPorSacoKg: Prisma.Decimal | null;
+  esAgenteRetencion: boolean;
+};
+
 @Injectable()
 export class RecepcionService {
   constructor(
@@ -83,6 +95,38 @@ export class RecepcionService {
     });
   }
 
+  // Datos para abrir la recepción rápida: puntos de compra activos que el usuario
+  // puede usar (solo el suyo si está asignado a uno), el peso del saco para
+  // calcular la tara y el punto por defecto.
+  async contexto(puntoCompraIdUsuario: string | null) {
+    const [puntos, config] = await Promise.all([
+      this.prisma.puntoCompra.findMany({
+        where: {
+          activo: true,
+          ...(puntoCompraIdUsuario ? { id: puntoCompraIdUsuario } : {}),
+        },
+        select: { id: true, nombre: true },
+        orderBy: { nombre: 'asc' },
+      }),
+      this.prisma.configuracionTenant.findFirst({
+        select: {
+          taraPorSacoKg: true,
+          esAgenteRetencion: true,
+          modoCompraPergamino: true,
+        },
+      }),
+    ]);
+    return {
+      puntosCompra: puntos,
+      puntoCompraIdPorDefecto: puntos.length === 1 ? puntos[0].id : null,
+      modoCompraPergamino: config?.modoCompraPergamino ?? 'CALIDAD',
+      taraPorSacoKg: config?.taraPorSacoKg
+        ? Number(config.taraPorSacoKg)
+        : null,
+      esAgenteRetencion: config?.esAgenteRetencion ?? false,
+    };
+  }
+
   async findOne(id: string) {
     const recepcion = await this.prisma.recepcion.findUnique({
       where: { id },
@@ -90,6 +134,84 @@ export class RecepcionService {
     });
     if (!recepcion) throw new NotFoundException('Recepción no encontrada');
     return recepcion;
+  }
+
+  // La tara se digita o se calcula con los sacos (CU-01 paso 4). Queda copiada
+  // en la recepción: cambiar luego el peso del saco no la altera (regla 3).
+  private async resolverTara(
+    dto: CreateRecepcionDto,
+    cargarConfig: () => Promise<{
+      taraPorSacoKg: Prisma.Decimal | null;
+    } | null>,
+  ): Promise<number> {
+    if (dto.pesoTara !== undefined) return dto.pesoTara;
+    if (!dto.numeroSacos) {
+      throw new BadRequestException(
+        'Indica la tara (pesoTara) o el número de sacos (numeroSacos)',
+      );
+    }
+    const config = await cargarConfig();
+    if (!config?.taraPorSacoKg) {
+      throw new BadRequestException(
+        'Configura el peso del saco (taraPorSacoKg) para calcular la tara con el número de sacos',
+      );
+    }
+    return (
+      Math.round(dto.numeroSacos * Number(config.taraPorSacoKg) * 100) / 100
+    );
+  }
+
+  // CU-03: aplica solo si el negocio es agente de retención y el café es de los
+  // que retienen. Los parámetros salen de ParametroTributario por fecha (regla 7);
+  // si es agente y no hay ninguno vigente, falla en vez de inventar un valor.
+  private async resolverRetencion(
+    config: ConfigRecepcion | null,
+    tipoCafe: TipoCafeRecepcion,
+    valorTotal: string,
+    dia: Date,
+  ): Promise<ResultadoRetencion> {
+    if (!config?.esAgenteRetencion || !TIPOS_CON_RETENCION.has(tipoCafe)) {
+      const total = new Prisma.Decimal(valorTotal);
+      return {
+        aplica: false,
+        umbralPesos: new Prisma.Decimal(0),
+        baseRetencion: null,
+        tarifaRetencion: null,
+        valorRetencion: new Prisma.Decimal(0),
+        netoPagar: total,
+      };
+    }
+    const parametro = await this.prisma.parametroTributario.findFirst({
+      where: { concepto: 'RETENCION_COMPRA_CAFE', vigenteDesde: { lte: dia } },
+      orderBy: { vigenteDesde: 'desc' },
+    });
+    if (!parametro) {
+      throw new BadRequestException(
+        'El negocio es agente de retención pero no hay un parámetro tributario vigente para esta fecha. Contacta al administrador de la plataforma.',
+      );
+    }
+    return calcularRetencion(valorTotal, parametro);
+  }
+
+  // Vista previa para la pantalla de recepción (misma regla que el guardado).
+  async previsualizarRetencion(
+    tipoCafe: TipoCafeRecepcion,
+    valorTotal: number,
+  ) {
+    const config = await this.prisma.configuracionTenant.findFirst();
+    const r = await this.resolverRetencion(
+      config,
+      tipoCafe,
+      valorTotal.toFixed(2),
+      diaColombia(),
+    );
+    return {
+      aplica: r.aplica,
+      umbralPesos: r.umbralPesos.toString(),
+      tarifaRetencion: r.tarifaRetencion?.toString() ?? null,
+      valorRetencion: r.valorRetencion.toString(),
+      netoPagar: r.netoPagar.toString(),
+    };
   }
 
   private async assertProveedorActivo(proveedorId: string) {
@@ -172,7 +294,13 @@ export class RecepcionService {
     await this.assertProveedorActivo(dto.proveedorId);
     await this.assertPuntoCompraActivo(dto.puntoCompraId);
 
-    const pesoNeto = Math.round((dto.pesoBruto - dto.pesoTara) * 100) / 100;
+    // La configuración se lee una sola vez por recepción (tara y retención).
+    let configuracion: Promise<ConfigRecepcion | null> | undefined;
+    const cargarConfig = () =>
+      (configuracion ??= this.prisma.configuracionTenant.findFirst());
+
+    const pesoTara = await this.resolverTara(dto, cargarConfig);
+    const pesoNeto = Math.round((dto.pesoBruto - pesoTara) * 100) / 100;
     if (pesoNeto <= 0) {
       throw new BadRequestException(
         'El peso neto debe ser mayor a cero (peso bruto - tara)',
@@ -184,12 +312,23 @@ export class RecepcionService {
     let tablaPrecioTramoId: string | null = null;
     let factorRendimiento: number | null = null;
 
-    if (dto.tipoCafe === TipoCafeRecepcion.PERGAMINO) {
+    // Café seco: por calidad (humedad y factor, precio de la tabla del día) o a
+    // precio directo por kilo, como lo compran quienes no miden la calidad.
+    const porCalidad =
+      dto.tipoCafe === TipoCafeRecepcion.PERGAMINO &&
+      dto.analisisCalidad !== undefined;
+    if (porCalidad && dto.precioKg !== undefined) {
+      throw new BadRequestException(
+        'Indica la calidad (humedad y factor) o el precio por kilo, no ambos',
+      );
+    }
+
+    if (porCalidad) {
       const analisis = dto.analisisCalidad!;
       factorRendimiento = this.resolverFactorRendimiento(analisis);
 
       const tramo = await this.tablaPrecios.findMatch({
-        fecha,
+        fecha: diaColombia(fecha),
         puntoCompraId: dto.puntoCompraId,
         humedad: analisis.humedad,
         factorRendimiento,
@@ -202,19 +341,25 @@ export class RecepcionService {
       precioKg = Number(tramo.precioKg);
       tablaPrecioTramoId = tramo.id;
     } else {
-      // MOJADO y PASILLA: precio directo negociado, sin análisis de calidad.
+      // MOJADO, PASILLA y pergamino a precio directo: sin análisis de calidad.
       // El mojado recién lavado no se mide con el rango de humedad de la
       // tabla de precios (ese rango es de café seco); su valor real se sabe
       // después, al secarlo y trillarlo en Bodega.
       if (!dto.precioKg) {
         throw new BadRequestException(
-          'Se requiere precioKg para recepciones de mojado o pasilla',
+          'Se requiere precioKg para recepciones de mojado, pasilla o pergamino a precio por kilo',
         );
       }
       precioKg = dto.precioKg;
     }
 
     const valorTotal = Math.round(pesoNeto * precioKg * 100) / 100;
+    const retencion = await this.resolverRetencion(
+      await cargarConfig(),
+      dto.tipoCafe,
+      valorTotal.toFixed(2),
+      diaColombia(fecha),
+    );
 
     try {
       // Consecutivo atómico en su propia sentencia (no dentro de la transacción):
@@ -238,11 +383,16 @@ export class RecepcionService {
             tipoCafe: dto.tipoCafe,
             fecha,
             pesoBruto: dto.pesoBruto,
-            pesoTara: dto.pesoTara,
+            pesoTara,
+            numeroSacos: dto.numeroSacos,
             pesoNeto,
             tablaPrecioTramoId,
             precioKg,
             valorTotal,
+            baseRetencion: retencion.baseRetencion,
+            tarifaRetencion: retencion.tarifaRetencion,
+            valorRetencion: retencion.valorRetencion,
+            netoPagar: retencion.netoPagar,
             createdById,
           },
         });
@@ -261,7 +411,7 @@ export class RecepcionService {
           },
         });
 
-        if (dto.tipoCafe === TipoCafeRecepcion.PERGAMINO) {
+        if (porCalidad) {
           const analisis = dto.analisisCalidad!;
           const analisisCalidad = await tx.analisisCalidad.create({
             data: {

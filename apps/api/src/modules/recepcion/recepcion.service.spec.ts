@@ -35,6 +35,16 @@ function buildService() {
   const prisma = {
     $queryRaw: jest.fn().mockResolvedValue([{ valorActual: 1 }]),
     recepcion: { findMany: jest.fn(), findUnique: jest.fn() },
+    configuracionTenant: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue({ taraPorSacoKg: 0.5, esAgenteRetencion: false }),
+    },
+    parametroTributario: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue({ valorUvt: 52374, umbralUvt: 70, tarifa: 0.005 }),
+    },
     proveedor: {
       findUnique: jest.fn().mockResolvedValue({ id: 'p1', activo: true }),
     },
@@ -103,6 +113,256 @@ describe('RecepcionService', () => {
         ),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('create · tara por número de sacos', () => {
+    const sinTara = (
+      extra: Partial<CreateRecepcionDto> = {},
+    ): CreateRecepcionDto => {
+      const { pesoTara: _omitida, ...resto } = pergamino();
+      void _omitida;
+      return { ...resto, ...extra };
+    };
+
+    it('sin tara y con sacos: tara = sacos × peso del saco, y se guarda copiada', async () => {
+      const { service, tx } = buildService();
+      await service.create('t1', 'u1', sinTara({ numeroSacos: 20 }));
+      expect(dataCreada(tx)).toMatchObject({
+        pesoTara: 10,
+        numeroSacos: 20,
+        pesoNeto: 100,
+      });
+    });
+
+    it('redondea la tara a 2 decimales', async () => {
+      const { service, prisma, tx } = buildService();
+      prisma.configuracionTenant.findFirst.mockResolvedValue({
+        taraPorSacoKg: 0.333,
+      });
+      await service.create('t1', 'u1', sinTara({ numeroSacos: 7 }));
+      expect(dataCreada(tx).pesoTara).toBe(2.33);
+    });
+
+    it('una tara digitada manda sobre el cálculo por sacos', async () => {
+      const { service, tx } = buildService();
+      await service.create(
+        't1',
+        'u1',
+        pergamino({ pesoTara: 4, numeroSacos: 20 }),
+      );
+      expect(dataCreada(tx)).toMatchObject({ pesoTara: 4, numeroSacos: 20 });
+    });
+
+    it('tara cero digitada es válida (no se confunde con "omitida")', async () => {
+      const { service, tx } = buildService();
+      await service.create('t1', 'u1', pergamino({ pesoTara: 0 }));
+      expect(dataCreada(tx).pesoTara).toBe(0);
+    });
+
+    it('sin tara ni sacos → 400', async () => {
+      const { service, prisma } = buildService();
+      await expect(service.create('t1', 'u1', sinTara())).rejects.toThrow(
+        /pesoTara.*numeroSacos/,
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('con sacos pero sin peso del saco configurado → 400', async () => {
+      const { service, prisma } = buildService();
+      prisma.configuracionTenant.findFirst.mockResolvedValue(null);
+      await expect(
+        service.create('t1', 'u1', sinTara({ numeroSacos: 20 })),
+      ).rejects.toThrow(/taraPorSacoKg/);
+    });
+
+    it('la tara calculada que deja peso neto <= 0 → 400', async () => {
+      const { service } = buildService();
+      await expect(
+        service.create('t1', 'u1', sinTara({ pesoBruto: 10, numeroSacos: 20 })),
+      ).rejects.toThrow(/peso neto/);
+    });
+  });
+
+  describe('create · retención en la fuente (CU-03)', () => {
+    // 200 kg netos × $20.000 = $4.000.000 (> 70 UVT = $3.666.180)
+    const grande = () => pergamino({ pesoBruto: 210, pesoTara: 10 });
+    const agente = (b: ReturnType<typeof buildService>, esAgente = true) =>
+      b.prisma.configuracionTenant.findFirst.mockResolvedValue({
+        taraPorSacoKg: 0.5,
+        esAgenteRetencion: esAgente,
+      });
+
+    it('agente + pergamino sobre el umbral: guarda base, tarifa, retención y neto a pagar', async () => {
+      const b = buildService();
+      agente(b);
+      await b.service.create('t1', 'u1', grande());
+      const data = dataCreada(b.tx);
+      expect(data.valorTotal).toBe(4000000);
+      expect(String(data.baseRetencion)).toBe('4000000');
+      expect(String(data.tarifaRetencion)).toBe('0.005');
+      expect(String(data.valorRetencion)).toBe('20000');
+      expect(String(data.netoPagar)).toBe('3980000');
+    });
+
+    it('agente pero bajo el umbral: retención 0 y neto = valor total', async () => {
+      const b = buildService();
+      agente(b);
+      await b.service.create('t1', 'u1', pergamino());
+      const data = dataCreada(b.tx);
+      expect(String(data.valorRetencion)).toBe('0');
+      expect(String(data.netoPagar)).toBe('2000000');
+      expect(data.baseRetencion).toBeNull();
+    });
+
+    it('no agente de retención: nunca retiene, aunque supere el umbral', async () => {
+      const b = buildService();
+      await b.service.create('t1', 'u1', grande());
+      const data = dataCreada(b.tx);
+      expect(String(data.valorRetencion)).toBe('0');
+      expect(String(data.netoPagar)).toBe('4000000');
+      expect(b.prisma.parametroTributario.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('la pasilla no retiene aunque el negocio sea agente', async () => {
+      const b = buildService();
+      agente(b);
+      await b.service.create('t1', 'u1', {
+        puntoCompraId: 'pc1',
+        proveedorId: 'p1',
+        tipoCafe: TipoCafeRecepcion.PASILLA,
+        pesoBruto: 1010,
+        pesoTara: 10,
+        precioKg: 5000,
+      });
+      expect(String(dataCreada(b.tx).valorRetencion)).toBe('0');
+    });
+
+    it('agente sin parámetro tributario vigente → 400 y no guarda nada', async () => {
+      const b = buildService();
+      agente(b);
+      b.prisma.parametroTributario.findFirst.mockResolvedValue(null);
+      await expect(b.service.create('t1', 'u1', grande())).rejects.toThrow(
+        /parámetro tributario vigente/,
+      );
+      expect(b.prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('busca el parámetro por la fecha de Colombia (regla 7), el más reciente vigente', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-02T01:30:00Z')); // 8:30 p. m. del 1-oct en Bogotá
+      try {
+        const b = buildService();
+        agente(b);
+        await b.service.create('t1', 'u1', grande());
+        expect(b.prisma.parametroTributario.findFirst).toHaveBeenCalledWith({
+          where: {
+            concepto: 'RETENCION_COMPRA_CAFE',
+            vigenteDesde: { lte: new Date('2026-10-01T00:00:00.000Z') },
+          },
+          orderBy: { vigenteDesde: 'desc' },
+        });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('la vista previa usa la misma regla', async () => {
+      const b = buildService();
+      agente(b);
+      const r = await b.service.previsualizarRetencion(
+        TipoCafeRecepcion.PERGAMINO,
+        5000000,
+      );
+      expect(r).toEqual({
+        aplica: true,
+        umbralPesos: '3666180',
+        tarifaRetencion: '0.005',
+        valorRetencion: '25000',
+        netoPagar: '4975000',
+      });
+    });
+  });
+
+  describe('create · pergamino a precio directo por kilo', () => {
+    const directo = (
+      extra: Partial<CreateRecepcionDto> = {},
+    ): CreateRecepcionDto => ({
+      puntoCompraId: 'pc1',
+      proveedorId: 'p1',
+      tipoCafe: TipoCafeRecepcion.PERGAMINO,
+      pesoBruto: 110,
+      pesoTara: 10,
+      precioKg: 18000,
+      ...extra,
+    });
+
+    it('sin análisis de calidad usa el precio digitado, sin tabla de precios ni análisis', async () => {
+      const { service, tx, tablaPrecios } = buildService();
+      await service.create('t1', 'u1', directo());
+      expect(dataCreada(tx)).toMatchObject({
+        tipoCafe: TipoCafeRecepcion.PERGAMINO,
+        precioKg: 18000,
+        valorTotal: 1800000,
+        tablaPrecioTramoId: null,
+      });
+      expect(tablaPrecios.findMatch).not.toHaveBeenCalled();
+      expect(tx.analisisCalidad.create).not.toHaveBeenCalled();
+    });
+
+    it('entra al inventario de pergamino igual que el de calidad', async () => {
+      const { service, tx } = buildService();
+      await service.create('t1', 'u1', directo());
+      expect(
+        tx.movimientoInventario.create.mock.calls[0][0].data,
+      ).toMatchObject({
+        tipoCafe: TipoInventario.PERGAMINO,
+        cantidadKg: 100,
+      });
+    });
+
+    it('calidad y precio a la vez → 400 (hay que elegir uno)', async () => {
+      const { service, prisma } = buildService();
+      await expect(
+        service.create('t1', 'u1', pergamino({ precioKg: 18000 })),
+      ).rejects.toThrow(/no ambos/);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('ni calidad ni precio → 400', async () => {
+      const { service } = buildService();
+      await expect(
+        service.create('t1', 'u1', directo({ precioKg: undefined })),
+      ).rejects.toThrow(/precioKg/);
+    });
+
+    it('la retención también aplica al pergamino a precio directo', async () => {
+      const b = buildService();
+      b.prisma.configuracionTenant.findFirst.mockResolvedValue({
+        taraPorSacoKg: 0.5,
+        esAgenteRetencion: true,
+      });
+      // 200 kg × $20.000 = $4.000.000 ≥ 70 UVT
+      await b.service.create(
+        't1',
+        'u1',
+        directo({ pesoBruto: 210, precioKg: 20000 }),
+      );
+      expect(String(dataCreada(b.tx).valorRetencion)).toBe('20000');
+    });
+  });
+
+  describe('create · día de Colombia', () => {
+    it('a las 8:30 p. m. en Bogotá busca el precio del día de Bogotá, no el de UTC', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-02T01:30:00Z'));
+      try {
+        const { service, tablaPrecios } = buildService();
+        await service.create('t1', 'u1', pergamino());
+        expect(tablaPrecios.findMatch.mock.calls[0][0].fecha).toEqual(
+          new Date('2026-10-01T00:00:00.000Z'),
+        );
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 
@@ -471,6 +731,49 @@ describe('RecepcionService', () => {
       const r = await service.create('t1', 'u1', dto, LLAVE);
       expect(r).toEqual({ id: 'rec-9' });
       expect(tx.recepcion.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('contexto (recepción rápida)', () => {
+    const conPuntos = (puntos: { id: string; nombre: string }[]) => {
+      const b = buildService();
+      (b.prisma as any).puntoCompra.findMany = jest
+        .fn()
+        .mockResolvedValue(puntos);
+      return b;
+    };
+
+    it('un solo punto: queda como valor por defecto, y trae el peso del saco', async () => {
+      const { service } = conPuntos([{ id: 'pc1', nombre: 'Central' }]);
+      expect(await service.contexto(null)).toEqual({
+        puntosCompra: [{ id: 'pc1', nombre: 'Central' }],
+        puntoCompraIdPorDefecto: 'pc1',
+        taraPorSacoKg: 0.5,
+        esAgenteRetencion: false,
+        modoCompraPergamino: 'CALIDAD',
+      });
+    });
+
+    it('varios puntos: sin valor por defecto', async () => {
+      const { service } = conPuntos([
+        { id: 'a', nombre: 'A' },
+        { id: 'b', nombre: 'B' },
+      ]);
+      expect((await service.contexto(null)).puntoCompraIdPorDefecto).toBeNull();
+    });
+
+    it('usuario asignado a un punto: solo consulta ese punto', async () => {
+      const { service, prisma } = conPuntos([{ id: 'pc1', nombre: 'Central' }]);
+      await service.contexto('pc1');
+      expect(
+        (prisma as any).puntoCompra.findMany.mock.calls[0][0].where,
+      ).toEqual({ activo: true, id: 'pc1' });
+    });
+
+    it('sin peso del saco configurado devuelve null', async () => {
+      const { service, prisma } = conPuntos([{ id: 'pc1', nombre: 'C' }]);
+      prisma.configuracionTenant.findFirst.mockResolvedValue(null);
+      expect((await service.contexto(null)).taraPorSacoKg).toBeNull();
     });
   });
 

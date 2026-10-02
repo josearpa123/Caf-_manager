@@ -1,8 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, type LucideIcon } from 'lucide-react';
+import { LogOut, Menu, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -44,10 +45,48 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const pathname = usePathname();
+  // En pantallas chicas el menú es un cajón que se abre con la hamburguesa.
+  const [menuAbierto, setMenuAbierto] = useState(false);
+
+  useEffect(() => setMenuAbierto(false), [pathname]);
+
+  useEffect(() => {
+    if (!menuAbierto) return;
+    const onKeyDown = (e: KeyboardEvent) => e.key === 'Escape' && setMenuAbierto(false);
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [menuAbierto]);
 
   return (
-    <div className="flex min-h-dvh bg-muted/25">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-border/70 bg-card px-3.5 py-5">
+    <div className="min-h-dvh bg-muted/25 md:flex">
+      <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border/70 bg-card px-4 md:hidden">
+        <button
+          type="button"
+          onClick={() => setMenuAbierto(true)}
+          aria-label="Abrir menú"
+          aria-expanded={menuAbierto}
+          className="-ml-2 flex h-10 w-10 items-center justify-center rounded-md hover:bg-accent"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <BrandIcon className="h-4 w-4" />
+        </span>
+        <p className="truncate font-display text-base tracking-tight">{brandLabel}</p>
+      </header>
+      {menuAbierto && (
+        <div
+          className="fixed inset-0 z-40 bg-foreground/40 md:hidden"
+          onClick={() => setMenuAbierto(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r border-border/70 bg-card px-3.5 py-5 transition-transform duration-200 md:static md:z-auto md:translate-x-0 md:transition-none',
+          menuAbierto ? 'translate-x-0' : '-translate-x-full',
+        )}
+      >
         <div className="flex items-center gap-2.5 px-1.5 pb-6">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
             <BrandIcon className="h-[18px] w-[18px]" />
@@ -119,7 +158,7 @@ export function AppShell({
           </Button>
         </div>
       </aside>
-      <main className="min-w-0 flex-1">{children}</main>
+      <main className="min-w-0 md:flex-1">{children}</main>
     </div>
   );
 }

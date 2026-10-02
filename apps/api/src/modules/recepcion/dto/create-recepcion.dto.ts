@@ -1,7 +1,9 @@
 import { Type } from 'class-transformer';
 import {
   IsEnum,
+  IsInt,
   IsNumber,
+  IsOptional,
   IsPositive,
   IsString,
   Min,
@@ -25,23 +27,35 @@ export class CreateRecepcionDto {
   @IsPositive()
   pesoBruto: number;
 
+  // Si se omite, se calcula como numeroSacos × ConfiguracionTenant.taraPorSacoKg.
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  pesoTara: number;
+  pesoTara?: number;
 
-  // Solo PERGAMINO lleva análisis de calidad (humedad + factor de
-  // rendimiento): es café que el proveedor ya secó por su cuenta. El mojado
-  // recién lavado no se mide así, y la pasilla tampoco.
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  numeroSacos?: number;
+
+  // Solo el PERGAMINO puede llevar análisis de calidad (humedad + factor de
+  // rendimiento), y es opcional: quien compra café seco a precio por kilo envía
+  // `precioKg` en su lugar. Con análisis, el precio sale de la tabla del día.
   @ValidateIf(
-    (dto: CreateRecepcionDto) => dto.tipoCafe === TipoCafeRecepcion.PERGAMINO,
+    (dto: CreateRecepcionDto) =>
+      dto.tipoCafe === TipoCafeRecepcion.PERGAMINO &&
+      dto.precioKg === undefined,
   )
   @ValidateNested()
   @Type(() => CreateAnalisisCalidadDto)
   analisisCalidad?: CreateAnalisisCalidadDto;
 
-  // Precio directo negociado para MOJADO y PASILLA (no pasan por la tabla de precios).
+  // Precio directo negociado: obligatorio en MOJADO y PASILLA, y en PERGAMINO
+  // cuando no se envía análisis de calidad (no pasa por la tabla de precios).
   @ValidateIf(
-    (dto: CreateRecepcionDto) => dto.tipoCafe !== TipoCafeRecepcion.PERGAMINO,
+    (dto: CreateRecepcionDto) =>
+      dto.tipoCafe !== TipoCafeRecepcion.PERGAMINO ||
+      dto.analisisCalidad === undefined,
   )
   @IsNumber()
   @IsPositive()

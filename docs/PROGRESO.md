@@ -4,6 +4,79 @@
 
 **Última actualización:** 2026-10-01
 
+## Café seco por calidad o a precio por kilo (sesión 2026-10-01, tras revisar el sistema en local)
+
+Comentario del usuario al revisar: no todos los compradores miden humedad y factor; muchos solo pagan un precio por kilo. También: el sistema se ve complejo, sobre todo el menú con tantos módulos, y quiere un manual al final.
+
+- **Decisión (del usuario)**: opción del negocio + interruptor en cada compra.
+- **Backend**: `POST /recepcion` acepta pergamino con `analisisCalidad` (precio de la tabla del día, como antes) **o** con `precioKg` (precio directo); ambos a la vez → 400. Nueva opción `ConfiguracionTenant.modoCompraPergamino` (`CALIDAD` por defecto | `PRECIO_DIRECTO`), migración `20261002120000_modo_compra_pergamino`, expuesta en `GET /recepcion/contexto` y `PATCH /tenants/me/configuracion`. El pergamino a precio directo no crea análisis ni usa tramo, entra al inventario de pergamino y retiene igual que el de calidad. Los reportes ya tomaban el análisis como opcional.
+- **Web**: en café seco, interruptor "Por calidad / A precio por kilo" con el valor inicial de la configuración; en modo precio desaparecen humedad, muestra, almendra y factor. Configuración: grupo "Cuando compro café seco".
+- **Pruebas**: 9 unitarias y 4 de validación del DTO, 1 de integración con PostgreSQL real; navegador (390 px): precio por kilo $18.000 × 100 kg = $1.800.000 (REC-2026-000024) y el interruptor por compra. API: 175 unitarias aprox. y 39 de integración.
+- **Siguen pendientes de este comentario**: simplificar el menú (módulos ocultables y agrupados) y el manual (Ayuda dentro del sistema + documento en el repo).
+
+## Sprint 2 · PR 1 — zona horaria de Colombia y retención en la fuente, cierra H5 (sesión 2026-10-01)
+
+Rama `feat/zona-horaria-y-retencion`, apilada sobre `feat/recepcion-rapida-web` (PR #8). Decisiones del usuario: zona horaria fija America/Bogota; retención opcional (la activa el comprador en Configuración) y solo por recepción; **yo investigo y aplico los valores tributarios**. Detalle en `docs/adr/009-zona-horaria-y-retencion.md`.
+
+- **Cubre**: H5, RF-09, CU-03, regla 7; arregla el hallazgo del Sprint 1 (sin precio después de las 7 p. m.).
+- **Zona horaria**: `src/common/fecha-colombia.ts` (`diaColombia`, `anioColombia`) aplicado a la búsqueda del tramo de precios (guardado, vista previa y listado), el año del consecutivo y la vigencia del parámetro tributario. Confirmado en vivo: el tramo de la BD local estaba sembrado con el día UTC y ya no coincidía con el día de Bogotá.
+- **Valores tributarios verificados** (no de memoria; dos fuentes independientes cada uno): UVT 2026 = $52.374 (Resolución DIAN 000238 de 2025); café pergamino o cereza = 0,5 % desde 70 UVT = $3.666.180 (Decreto 1625 de 2016), sin cambio con el Decreto 572 vigente desde el 1-jul-2026. Fuentes: gerencie.com (tabla 2026), UPTC (tabla 2026), buk.co y ámbito jurídico (UVT), Infobae (Decreto 572).
+- **Schema** (migración `20261002000000_retencion_y_parametros_tributarios`, aditiva): `ConfiguracionTenant.esAgenteRetencion` (false), `Recepcion.baseRetencion/tarifaRetencion/valorRetencion/netoPagar` (backfill: retención 0, neto = total), tabla `ParametroTributario` con la fila 2026 sembrada.
+- **Cálculo** (`recepcion/retencion.ts`, `Prisma.Decimal`): "a partir de" el umbral (en 70 UVT exactos sí retiene), a centavos mitad hacia arriba; aplica a pergamino y mojado, **no a pasilla** (interpretación a confirmar con el contador, una línea para cambiarla). Agente sin parámetro vigente → 400, no inventa. Los cuatro campos se copian e inmutan al guardar.
+- **API**: `GET /recepcion/retencion` (vista previa con la misma regla), `esAgenteRetencion` en el contexto y en `PATCH /tenants/me/configuracion`.
+- **Web**: casilla "Soy agente de retención en la fuente" en Configuración; la pantalla rápida muestra retención y neto a pagar en vivo y en el resultado cuando aplica.
+- **Pruebas**: 7 del cálculo (borde exacto, redondeo, sin flotantes), 8 del servicio (agente, bajo umbral, no agente, pasilla, sin parámetro, día de Bogotá, vista previa) y 3 de zona horaria; integración con PostgreSQL real: retención de punta a punta con la fila sembrada, inmutabilidad, año del consecutivo el 31-dic. API: 160 unitarias aprox. y 38 de integración; lint y build limpios. Navegador (390 px): $4.300.000 → retención $21.500 → neto $4.278.500 y sin retención al desactivar (REC-2026-000021 en la BD local; la opción quedó desactivada).
+
+### Incidente de fusión (2026-10-01)
+Los PR apilados #4–#9 se fusionaron de abajo hacia arriba: #7 (tara y precio) y #8 (pantalla rápida, menú responsive, configuración) quedaron fusionados solo en ramas intermedias y **no llegaron a `main`** (`main` terminaba en #6). Este PR (#10) los trae de vuelta junto con el Sprint 2 y un arreglo de lint en los specs de pagos/anticipos (los PR apilados no corren CI). Lección: con PR apilados, fusionar de arriba hacia abajo o retargetear cada uno a `main` antes de fusionar.
+
+### Pendiente / fuera de alcance
+- **Cada diciembre**: cargar la UVT del año siguiente en `ParametroTributario` (sin pantalla de super-admin todavía; hoy con SQL/migración).
+- Confirmar con un contador: pasilla sin retención, redondeo por transacción y que no se acumule por proveedor.
+- Reportes agrupan en UTC (una compra de las 8 p. m. cuenta para el día siguiente): migrar a `diaColombia`.
+- Anulación (RF-07/08), pago en el mismo paso (RF-10) y recibo térmico/compartir (RF-06): siguientes PR del Sprint 2. El recibo debe imprimir base, tarifa, retención y neto.
+
+## Sprint 1 · PR 5 — pantalla de recepción rápida, cierra H3 en código (sesión 2026-10-01)
+
+Rama `feat/recepcion-rapida-web`, apilada sobre `feat/recepcion-rapida-backend` (PR #7). Captura: `docs/img/recepcion-rapida-movil.png` (datos ficticios de la simulación).
+
+- **Cubre**: H3, RF-02, CU-01 pasos 1–5 y 7–9 (guardar; el recibo térmico y el pago en el mismo paso son del Sprint 2), flujo 2a (alta exprés), 5b/7a parcial.
+- **Decisiones de diseño** (acordadas como recomendación, el usuario dijo "sigue"): una sola pantalla; muestra solo precio y total (la retención es del Sprint 2); alta exprés en diálogo.
+- **`/recepcion/rapida`** (el botón "Nueva recepción" del listado ahora va aquí; `/recepcion/nueva` sigue como "Formulario completo"):
+  - Buscador de proveedor con resultados mientras se escribe (cédula, nombre o apodo, sin tildes), flechas + Enter; última opción "Nuevo proveedor" que abre el **alta exprés** con lo escrito ya repartido (número o nombre) y deja el cursor en el peso.
+  - Valores por defecto: punto de compra (si hay uno), tipo de café de la última recepción del proveedor, tara por sacos.
+  - **Enter avanza al siguiente campo y en el último guarda**; teclado decimal en celular; acepta coma decimal.
+  - Precio y total en vivo para pergamino (`GET /tabla-precios/precio`); aviso si no hay tramo; mojado/pasilla piden precio directo; factor calculado o digitado.
+  - **`Idempotency-Key`** en el guardado: mismo cuerpo reintenta con la misma llave (si se corta la señal no se duplica); cuerpo editado, llave nueva. Pantalla de resultado con código y "Nueva recepción".
+- **`GET /recepcion/contexto`** (permiso `RECEPCION_CREAR`): puntos de compra, punto por defecto y peso del saco; el operador no necesita permisos de configuración. 4 pruebas unitarias.
+- **Menú responsive** (`AppShell`): en pantallas chicas la barra lateral es un cajón con botón de hamburguesa. **Antes de este cambio el panel completo era inusable en celular** (la barra de 256 px dejaba ~130 px de contenido); afecta a todas las pantallas y a la plataforma de super-admin, que usan el mismo shell.
+- **Configuración**: tarjeta "Recepción" para fijar el peso del saco y el rango de humedad (la web no tenía ningún formulario de `tenants/me/configuracion`).
+- **Verificación**: probado en Edge headless (390 px, `puppeteer-core` desde una carpeta temporal; no se agregó ninguna dependencia al repo; la extensión de Chrome no estaba conectada): flujo completo proveedor → pesos → humedad/muestra → guardar (REC-2026-000019 y 000020 en la BD **local** de simulación; contraseña de demostración reseteada para `admin1@cooperativalosandessim.test`, no se versiona), alta exprés, búsqueda por apodo y sin tildes, y la tarjeta de configuración. Sin errores de consola. El flujo automatizado tarda ~1,9 s; **los 45 s del criterio de cierre hay que medirlos con una persona y cronómetro** (10 veces seguidas en celular).
+- API: 140 unitarias; `next build` y lint de la web limpios.
+
+### Pendiente / fuera de alcance
+- Medición con cronómetro (criterio de cierre del Sprint 1) y ajustes que salgan de ahí.
+- La web no tiene pruebas automatizadas (no hay framework instalado); esta pantalla se verificó a mano con el navegador. Proponer Playwright (dependencia nueva, requiere tu aprobación).
+- Defectos de calidad y observaciones no están en la pantalla rápida (siguen en el formulario completo).
+- Pagos, anticipos y ventas de la web aún no envían `Idempotency-Key`.
+- El formulario de proveedores no tiene campo `apodo`.
+- Sin detección de recepción duplicada "parecida" (mismo proveedor, mismo peso, minutos de diferencia) más allá de la llave.
+
+## Sprint 1 · PR 4 — backend de la recepción rápida: tara por sacos y vista previa de precio (sesión 2026-10-01)
+
+Rama `feat/recepcion-rapida-backend`, apilada sobre `feat/busqueda-proveedor` (PR #6).
+
+- **Cubre**: CU-01 pasos 4–5 (backend), RF-01/RF-03 parcial. Prepara la pantalla web de H3.
+- **Schema**: migración aditiva `20261001150000_recepcion_sacos_y_tara`: `Recepcion.numeroSacos Int?` y `ConfiguracionTenant.taraPorSacoKg Decimal(6,3)?`. Sin deriva en `migrate diff`.
+- **`POST /recepcion`**: `pesoTara` pasa a opcional. Sin tara y con `numeroSacos` → tara = sacos × `taraPorSacoKg` (redondeada a 2 decimales y copiada en la recepción: cambiar el peso del saco luego no la altera). Una tara digitada (incluida 0) manda sobre el cálculo. Sin tara ni sacos, o sin peso del saco configurado → 400. Compatible hacia atrás: los clientes actuales siguen enviando `pesoTara`.
+- **`PUT` de configuración** acepta `taraPorSacoKg`.
+- **`GET /tabla-precios/precio?puntoCompraId&humedad&factorRendimiento`** (permiso `RECEPCION_CREAR`, el operador no necesita `PRECIOS_VER`): usa la misma búsqueda y fecha que el guardado, así la pantalla no duplica lógica de precios; el valor que manda es el del servidor al guardar. Decisión mía (reversible): endpoint en vez de calcular el tramo en el navegador.
+- **Pruebas**: 7 unitarias de tara, 2 de vista previa y 2 de integración con PostgreSQL real. API: 136 unitarias y 33 de integración; lint y build limpios.
+- **Hallazgo de paso (sin corregir)**: el guardado busca el tramo con `fecha = new Date()` y la fecha de la tabla de precios es `@db.Date`; la comparación se hace en UTC, así que **después de las 7 p. m. hora de Colombia el "día" ya es el siguiente y no se encuentra tramo**. Hay que decidir la zona horaria del tenant (afecta también consecutivos por año y reportes).
+
+### Pendiente / fuera de alcance
+- La pantalla web de recepción rápida y el campo de peso del saco en Configuración.
+
 ## Sprint 1 · PR 3 — búsqueda de proveedor con pg_trgm (sesión 2026-10-01)
 
 Rama `feat/busqueda-proveedor`, apilada sobre `feat/idempotencia-pagos-ventas` (PR #5).
