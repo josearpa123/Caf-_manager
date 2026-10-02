@@ -62,7 +62,7 @@ Los diagramas de este documento son la versión para leer. El anexo trae los mis
 | Sprint | Estado | Detalle |
 | --- | --- | --- |
 | 0 · Bases | En curso | PR 1 hecho (pruebas de dominio de recepción, H2 parcial). PR 2 hecho: consecutivos atómicos en los 7 servicios (**H1 cerrado**). PR 3 hecho: pruebas de `pagos` (**H2 cerrado** en lo funcional; cobertura 100% de líneas en `recepcion` y `pagos`). PR 4 hecho: CI con umbral de cobertura (90% líneas en servicios de `recepcion` y `pagos`), verificación schema↔migraciones y pruebas de integración. Pendiente: Sentry (requiere aprobar dependencias) y activar la protección de la rama `main` en GitHub |
-| 1 · Recepción rápida | En curso | PR 1 y 2 hechos: idempotencia en `POST /recepcion`, `/pagos`, `/anticipos` y `/ventas` con tabla genérica `IdempotencyKey` (ADR-007, **H7 cerrado en el backend**). Pendiente: enviar la llave desde la web; búsqueda de proveedor con `pg_trgm`; pantalla de recepción rápida (H3) |
+| 1 · Recepción rápida | En curso | PR 1 y 2 hechos: idempotencia en `POST /recepcion`, `/pagos`, `/anticipos` y `/ventas` con tabla genérica `IdempotencyKey` (ADR-007, **H7 cerrado en el backend**). PR 3 hecho: búsqueda de proveedor `GET /proveedores/buscar` con `pg_trgm` y `apodo` (RF-02, ADR-008). Pendiente: enviar la llave desde la web; pantalla de recepción rápida (H3) |
 | 2–4 | Pendiente | — |
 
 **Fase 2 (enero–marzo de 2027), solo si pasa el punto de decisión del 5 de enero:** documento soporte electrónico con un proveedor tecnológico (H8), modo sin conexión (PWA con cola local), cobro de la suscripción y suspensión por mora dentro de la plataforma.
@@ -210,7 +210,7 @@ El administrador puede hacer todo lo del operador. "Registrar recepción rápida
 | `IdempotencyKey` (nueva, hecha) | `tenantId`, `alcance`, `llave` | `String` ×3 | Llave primaria compuesta; la genera el cliente (UUID) y viaja en el encabezado `Idempotency-Key`. Sirve a todos los módulos de plata (ADR-007) | 1 |
 | `IdempotencyKey` | `hashSolicitud`, `recursoId`, `expiraEn` | `String`, `String?`, `DateTime` | Se reserva como primera sentencia de la transacción de negocio y se completa con el id creado; vigencia de 24 h; misma llave con otro cuerpo → 409 | 1 |
 | `Recepcion` | `numeroSacos` | `Int?` | Tara = sacos × `ConfiguracionTenant.taraPorSacoKg` | 1 |
-| `Proveedor` | `apodo` | `String?` | Buscable; índice de trigramas (`pg_trgm`) sobre nombre, apodo y cédula | 1 |
+| `Proveedor` (hecho) | `apodo` | `String?` | Buscable; índice de trigramas (`pg_trgm`) sobre nombre, apodo y cédula | 1 |
 | `ConfiguracionTenant` | `taraPorSacoKg`, `esAgenteRetencion` | `Decimal`, `Boolean` | Valores por defecto de la recepción rápida y la retención | 1–2 |
 | `Recepcion` | `estado` | enum `ACTIVA`, `ANULADA` | Por defecto `ACTIVA`; los reportes filtran `ACTIVA` | 2 |
 | `Recepcion` | `anuladaPorId`, `fechaAnulacion`, `motivoAnulacion` | `String?`, `DateTime?`, `String?` | Obligatorios cuando `estado = ANULADA` | 2 |
@@ -243,6 +243,7 @@ El administrador puede hacer todo lo del operador. "Registrar recepción rápida
 5. ADR-005 · Trabajos externos por cola (BullMQ), nunca dentro de la petición.
 6. ADR-006 · Hostinger KVM 2 con Coolify como plataforma de despliegue.
 7. ADR-007 · Idempotencia con tabla genérica de llaves reservada dentro de la transacción.
+8. ADR-008 · Búsqueda de proveedor con trigramas (`pg_trgm`) en un endpoint propio.
 
 ## Escalabilidad sin cuellos de botella
 

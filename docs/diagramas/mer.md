@@ -146,6 +146,7 @@ erDiagram
     string id PK
     string tenantId FK
     string nombre
+    string apodo
     string createdById FK
   }
   Comprador {
