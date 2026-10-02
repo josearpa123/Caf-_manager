@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   BarChart3,
   Coffee,
   FileText,
   HandCoins,
+  LifeBuoy,
   PackageCheck,
   Settings,
   ShoppingCart,
@@ -16,23 +17,29 @@ import {
   Warehouse,
 } from 'lucide-react';
 import { Modulo } from '@coffee-manager/shared-types';
+import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { AppShell, type AppShellNavItem } from '@/components/shell/app-shell';
 import { ModuloBloqueado } from '@/components/shell/modulo-bloqueado';
 
 // Un ítem sin `modulo` no se puede excluir de un plan: la administración del
 // propio tenant va siempre incluida.
+//
+// Además del plan, el propio negocio puede ocultar módulos que no usa
+// (Configuración → "Qué quiero ver en el menú"): es solo visual, no quita
+// permisos. Configuración nunca se oculta.
 const navItems: (AppShellNavItem & { modulo?: Modulo })[] = [
-  { href: '/proveedores', label: 'Proveedores', icon: Users, modulo: Modulo.PROVEEDORES },
-  { href: '/recepcion', label: 'Recepción', icon: PackageCheck, modulo: Modulo.RECEPCION },
-  { href: '/bodega', label: 'Bodega', icon: Warehouse, modulo: Modulo.BODEGA },
-  { href: '/ventas', label: 'Ventas', icon: ShoppingCart, modulo: Modulo.VENTAS },
-  { href: '/cortes', label: 'Cortes', icon: Truck, modulo: Modulo.CORTES },
-  { href: '/pagos', label: 'Pagos', icon: Wallet, modulo: Modulo.PAGOS },
-  { href: '/prestamos', label: 'Préstamos', icon: HandCoins, modulo: Modulo.PRESTAMOS },
-  { href: '/facturacion', label: 'Facturación', icon: FileText, modulo: Modulo.FACTURACION },
-  { href: '/reportes', label: 'Reportes', icon: BarChart3, exact: true, modulo: Modulo.REPORTES },
-  { href: '/configuracion', label: 'Configuración', icon: Settings },
+  { section: 'Comprar', href: '/recepcion', label: 'Recepción', icon: PackageCheck, modulo: Modulo.RECEPCION },
+  { section: 'Comprar', href: '/proveedores', label: 'Proveedores', icon: Users, modulo: Modulo.PROVEEDORES },
+  { section: 'Comprar', href: '/pagos', label: 'Pagos', icon: Wallet, modulo: Modulo.PAGOS },
+  { section: 'Comprar', href: '/prestamos', label: 'Préstamos', icon: HandCoins, modulo: Modulo.PRESTAMOS },
+  { section: 'Café', href: '/bodega', label: 'Bodega', icon: Warehouse, modulo: Modulo.BODEGA },
+  { section: 'Café', href: '/ventas', label: 'Ventas', icon: ShoppingCart, modulo: Modulo.VENTAS },
+  { section: 'Café', href: '/cortes', label: 'Cortes', icon: Truck, modulo: Modulo.CORTES },
+  { section: 'Administración', href: '/facturacion', label: 'Facturación', icon: FileText, modulo: Modulo.FACTURACION },
+  { section: 'Administración', href: '/reportes', label: 'Reportes', icon: BarChart3, exact: true, modulo: Modulo.REPORTES },
+  { section: 'Administración', href: '/configuracion', label: 'Configuración', icon: Settings },
+  { section: 'Administración', href: '/ayuda', label: 'Ayuda', icon: LifeBuoy },
 ];
 
 export default function DashboardLayout({
@@ -43,6 +50,20 @@ export default function DashboardLayout({
   const { user, isLoading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [ocultos, setOcultos] = useState<Modulo[]>([]);
+
+  // Módulos que el negocio escondió del menú. Mientras carga se muestra todo.
+  useEffect(() => {
+    if (!user) return;
+    const cargar = () =>
+      api
+        .get<{ modulosOcultos: Modulo[] }>('/tenants/me/configuracion/menu')
+        .then((r) => setOcultos(r.modulosOcultos))
+        .catch(() => {});
+    void cargar();
+    window.addEventListener('menu:actualizar', cargar);
+    return () => window.removeEventListener('menu:actualizar', cargar);
+  }, [user]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -62,9 +83,11 @@ export default function DashboardLayout({
   // todo. El bloqueo de verdad lo hace el ModuloGuard en la API; esto es para
   // que el tenant no vea puertas que no puede abrir.
   const modulos = user.modulos;
-  const navVisible = modulos
-    ? navItems.filter((item) => !item.modulo || modulos.includes(item.modulo))
-    : navItems;
+  const navVisible = navItems.filter(
+    (item) =>
+      !item.modulo ||
+      ((!modulos || modulos.includes(item.modulo)) && !ocultos.includes(item.modulo)),
+  );
 
   // Al menú no se llega, pero a la URL sí (un link guardado, el historial).
   // Si la ruta pertenece a un módulo fuera del plan, mostramos la explicación

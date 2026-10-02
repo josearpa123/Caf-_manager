@@ -52,7 +52,8 @@ Al terminar cada tarea (antes del commit final del PR):
    - Si cambió un flujo, actualiza el caso de uso y el diagrama de secuencia.
    - Si tomaste una decisión de arquitectura nueva, crea un ADR en `docs/adr/NNN-titulo.md` (contexto, decisión, consecuencias) y enlázalo.
    - Si algo del plan resultó distinto a lo escrito, corrige el texto y explica el porqué en PROGRESO.md. No dejes el documento diciendo algo que el código ya no hace.
-3. Al final de tu respuesta, dame un resumen corto con: archivos tocados, requisitos cubiertos, cómo probarlo a mano y qué sigue.
+3. **Manual de usuario** (`apps/web/content/manual.md`, se ve en el sistema en Administración → Ayuda): si el cambio modifica lo que el usuario ve o hace (pantallas, opciones de Configuración, mensajes de error, reglas como la retención), actualízalo en el mismo PR, con palabras simples y sin tablas. Pregunta antes de agregar contenido que no puedas verificar contra el sistema.
+4. Al final de tu respuesta, dame un resumen corto con: archivos tocados, requisitos cubiertos, cómo probarlo a mano y qué sigue.
 
 ## Prioridad actual
 
