@@ -92,6 +92,26 @@ export class RecepcionService {
     return recepcion;
   }
 
+  // La tara se digita o se calcula con los sacos (CU-01 paso 4). Queda copiada
+  // en la recepción: cambiar luego el peso del saco no la altera (regla 3).
+  private async resolverTara(dto: CreateRecepcionDto): Promise<number> {
+    if (dto.pesoTara !== undefined) return dto.pesoTara;
+    if (!dto.numeroSacos) {
+      throw new BadRequestException(
+        'Indica la tara (pesoTara) o el número de sacos (numeroSacos)',
+      );
+    }
+    const config = await this.prisma.configuracionTenant.findFirst();
+    if (!config?.taraPorSacoKg) {
+      throw new BadRequestException(
+        'Configura el peso del saco (taraPorSacoKg) para calcular la tara con el número de sacos',
+      );
+    }
+    return (
+      Math.round(dto.numeroSacos * Number(config.taraPorSacoKg) * 100) / 100
+    );
+  }
+
   private async assertProveedorActivo(proveedorId: string) {
     const proveedor = await this.prisma.proveedor.findUnique({
       where: { id: proveedorId },
@@ -172,7 +192,8 @@ export class RecepcionService {
     await this.assertProveedorActivo(dto.proveedorId);
     await this.assertPuntoCompraActivo(dto.puntoCompraId);
 
-    const pesoNeto = Math.round((dto.pesoBruto - dto.pesoTara) * 100) / 100;
+    const pesoTara = await this.resolverTara(dto);
+    const pesoNeto = Math.round((dto.pesoBruto - pesoTara) * 100) / 100;
     if (pesoNeto <= 0) {
       throw new BadRequestException(
         'El peso neto debe ser mayor a cero (peso bruto - tara)',
@@ -238,7 +259,8 @@ export class RecepcionService {
             tipoCafe: dto.tipoCafe,
             fecha,
             pesoBruto: dto.pesoBruto,
-            pesoTara: dto.pesoTara,
+            pesoTara,
+            numeroSacos: dto.numeroSacos,
             pesoNeto,
             tablaPrecioTramoId,
             precioKg,

@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional } from 'class-validator';
+import { IsNumber, IsOptional, IsPositive } from 'class-validator';
 
 export class UpsertConfiguracionDto {
   @IsNumber()
@@ -18,4 +18,10 @@ export class UpsertConfiguracionDto {
   @IsOptional()
   @IsNumber()
   saldoProveedorUmbral?: number;
+
+  // Peso del saco vacío en kg; permite calcular la tara a partir del número de sacos.
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  taraPorSacoKg?: number;
 }

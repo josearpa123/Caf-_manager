@@ -58,6 +58,33 @@ describe('TablaPreciosService', () => {
     });
   });
 
+  describe('precioVigente', () => {
+    const query = { puntoCompraId: 'pc1', humedad: 11, factorRendimiento: 90 };
+
+    it('devuelve el tramo y su precio como número', async () => {
+      const { service, prisma } = build();
+      prisma.tablaPrecioTramo.findMany.mockResolvedValue([
+        {
+          id: 'general',
+          nombre: 'Primera',
+          puntoCompraId: null,
+          precioKg: '21500.00',
+        },
+      ]);
+      expect(await service.precioVigente(query)).toEqual({
+        tramoId: 'general',
+        nombre: 'Primera',
+        precioKg: 21500,
+      });
+    });
+
+    it('sin tramo para esa calidad devuelve null', async () => {
+      const { service, prisma } = build();
+      prisma.tablaPrecioTramo.findMany.mockResolvedValue([]);
+      expect(await service.precioVigente(query)).toBeNull();
+    });
+  });
+
   describe('findVigentes', () => {
     it('sin punto de compra no filtra por punto', async () => {
       const { service, prisma } = build();

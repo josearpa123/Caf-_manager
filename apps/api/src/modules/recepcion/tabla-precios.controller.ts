@@ -6,6 +6,7 @@ import { RequireModulo } from '../../common/decorators/require-modulo.decorator'
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateTablaPrecioTramoDto } from './dto/create-tabla-precio-tramo.dto';
 import { QueryTablaPreciosDto } from './dto/query-tabla-precios.dto';
+import { QueryPrecioVigenteDto } from './dto/query-precio-vigente.dto';
 
 @Controller('tabla-precios')
 @RequireModulo(Modulo.RECEPCION)
@@ -16,6 +17,13 @@ export class TablaPreciosController {
   @Get()
   findVigentes(@Query() query: QueryTablaPreciosDto) {
     return this.tablaPreciosService.findVigentes(query);
+  }
+
+  // El operador de recepción no necesita PRECIOS_VER para ver el precio de su recepción.
+  @RequirePermissions(Permission.RECEPCION_CREAR)
+  @Get('precio')
+  precioVigente(@Query() query: QueryPrecioVigenteDto) {
+    return this.tablaPreciosService.precioVigente(query);
   }
 
   @RequirePermissions(Permission.PRECIOS_EDITAR)
