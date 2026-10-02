@@ -17,6 +17,9 @@ Rama `feat/zona-horaria-y-retencion`, apilada sobre `feat/recepcion-rapida-web` 
 - **Web**: casilla "Soy agente de retención en la fuente" en Configuración; la pantalla rápida muestra retención y neto a pagar en vivo y en el resultado cuando aplica.
 - **Pruebas**: 7 del cálculo (borde exacto, redondeo, sin flotantes), 8 del servicio (agente, bajo umbral, no agente, pasilla, sin parámetro, día de Bogotá, vista previa) y 3 de zona horaria; integración con PostgreSQL real: retención de punta a punta con la fila sembrada, inmutabilidad, año del consecutivo el 31-dic. API: 160 unitarias aprox. y 38 de integración; lint y build limpios. Navegador (390 px): $4.300.000 → retención $21.500 → neto $4.278.500 y sin retención al desactivar (REC-2026-000021 en la BD local; la opción quedó desactivada).
 
+### Incidente de fusión (2026-10-01)
+Los PR apilados #4–#9 se fusionaron de abajo hacia arriba: #7 (tara y precio) y #8 (pantalla rápida, menú responsive, configuración) quedaron fusionados solo en ramas intermedias y **no llegaron a `main`** (`main` terminaba en #6). Este PR (#10) los trae de vuelta junto con el Sprint 2 y un arreglo de lint en los specs de pagos/anticipos (los PR apilados no corren CI). Lección: con PR apilados, fusionar de arriba hacia abajo o retargetear cada uno a `main` antes de fusionar.
+
 ### Pendiente / fuera de alcance
 - **Cada diciembre**: cargar la UVT del año siguiente en `ParametroTributario` (sin pantalla de super-admin todavía; hoy con SQL/migración).
 - Confirmar con un contador: pasilla sin retención, redondeo por transacción y que no se acumule por proveedor.
