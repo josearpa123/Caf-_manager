@@ -1,8 +1,10 @@
 name: Deploy
 
+# Solo manual hasta el Sprint 3: aún no existe el servidor Coolify ni los secretos
+# COOLIFY_WEBHOOK_URL / COOLIFY_API_TOKEN. Al montarlo, restaurar:
+#   push:
+#     branches: [main]
 on:
-  push:
-    branches: [main]
   workflow_dispatch: {}
 
 jobs:
