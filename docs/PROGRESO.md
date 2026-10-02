@@ -4,6 +4,21 @@
 
 **Última actualización:** 2026-10-01
 
+## Sprint 1 · PR 4 — backend de la recepción rápida: tara por sacos y vista previa de precio (sesión 2026-10-01)
+
+Rama `feat/recepcion-rapida-backend`, apilada sobre `feat/busqueda-proveedor` (PR #6).
+
+- **Cubre**: CU-01 pasos 4–5 (backend), RF-01/RF-03 parcial. Prepara la pantalla web de H3.
+- **Schema**: migración aditiva `20261001150000_recepcion_sacos_y_tara`: `Recepcion.numeroSacos Int?` y `ConfiguracionTenant.taraPorSacoKg Decimal(6,3)?`. Sin deriva en `migrate diff`.
+- **`POST /recepcion`**: `pesoTara` pasa a opcional. Sin tara y con `numeroSacos` → tara = sacos × `taraPorSacoKg` (redondeada a 2 decimales y copiada en la recepción: cambiar el peso del saco luego no la altera). Una tara digitada (incluida 0) manda sobre el cálculo. Sin tara ni sacos, o sin peso del saco configurado → 400. Compatible hacia atrás: los clientes actuales siguen enviando `pesoTara`.
+- **`PUT` de configuración** acepta `taraPorSacoKg`.
+- **`GET /tabla-precios/precio?puntoCompraId&humedad&factorRendimiento`** (permiso `RECEPCION_CREAR`, el operador no necesita `PRECIOS_VER`): usa la misma búsqueda y fecha que el guardado, así la pantalla no duplica lógica de precios; el valor que manda es el del servidor al guardar. Decisión mía (reversible): endpoint en vez de calcular el tramo en el navegador.
+- **Pruebas**: 7 unitarias de tara, 2 de vista previa y 2 de integración con PostgreSQL real. API: 136 unitarias y 33 de integración; lint y build limpios.
+- **Hallazgo de paso (sin corregir)**: el guardado busca el tramo con `fecha = new Date()` y la fecha de la tabla de precios es `@db.Date`; la comparación se hace en UTC, así que **después de las 7 p. m. hora de Colombia el "día" ya es el siguiente y no se encuentra tramo**. Hay que decidir la zona horaria del tenant (afecta también consecutivos por año y reportes).
+
+### Pendiente / fuera de alcance
+- La pantalla web de recepción rápida y el campo de peso del saco en Configuración.
+
 ## Sprint 1 · PR 3 — búsqueda de proveedor con pg_trgm (sesión 2026-10-01)
 
 Rama `feat/busqueda-proveedor`, apilada sobre `feat/idempotencia-pagos-ventas` (PR #5).

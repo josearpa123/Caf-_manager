@@ -35,6 +35,9 @@ function buildService() {
   const prisma = {
     $queryRaw: jest.fn().mockResolvedValue([{ valorActual: 1 }]),
     recepcion: { findMany: jest.fn(), findUnique: jest.fn() },
+    configuracionTenant: {
+      findFirst: jest.fn().mockResolvedValue({ taraPorSacoKg: 0.5 }),
+    },
     proveedor: {
       findUnique: jest.fn().mockResolvedValue({ id: 'p1', activo: true }),
     },
@@ -103,6 +106,75 @@ describe('RecepcionService', () => {
         ),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('create · tara por número de sacos', () => {
+    const sinTara = (
+      extra: Partial<CreateRecepcionDto> = {},
+    ): CreateRecepcionDto => {
+      const { pesoTara: _omitida, ...resto } = pergamino();
+      void _omitida;
+      return { ...resto, ...extra };
+    };
+
+    it('sin tara y con sacos: tara = sacos × peso del saco, y se guarda copiada', async () => {
+      const { service, tx } = buildService();
+      await service.create('t1', 'u1', sinTara({ numeroSacos: 20 }));
+      expect(dataCreada(tx)).toMatchObject({
+        pesoTara: 10,
+        numeroSacos: 20,
+        pesoNeto: 100,
+      });
+    });
+
+    it('redondea la tara a 2 decimales', async () => {
+      const { service, prisma, tx } = buildService();
+      prisma.configuracionTenant.findFirst.mockResolvedValue({
+        taraPorSacoKg: 0.333,
+      });
+      await service.create('t1', 'u1', sinTara({ numeroSacos: 7 }));
+      expect(dataCreada(tx).pesoTara).toBe(2.33);
+    });
+
+    it('una tara digitada manda sobre el cálculo por sacos', async () => {
+      const { service, prisma, tx } = buildService();
+      await service.create(
+        't1',
+        'u1',
+        pergamino({ pesoTara: 4, numeroSacos: 20 }),
+      );
+      expect(dataCreada(tx)).toMatchObject({ pesoTara: 4, numeroSacos: 20 });
+      expect(prisma.configuracionTenant.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('tara cero digitada es válida (no se confunde con "omitida")', async () => {
+      const { service, tx } = buildService();
+      await service.create('t1', 'u1', pergamino({ pesoTara: 0 }));
+      expect(dataCreada(tx).pesoTara).toBe(0);
+    });
+
+    it('sin tara ni sacos → 400', async () => {
+      const { service, prisma } = buildService();
+      await expect(service.create('t1', 'u1', sinTara())).rejects.toThrow(
+        /pesoTara.*numeroSacos/,
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('con sacos pero sin peso del saco configurado → 400', async () => {
+      const { service, prisma } = buildService();
+      prisma.configuracionTenant.findFirst.mockResolvedValue(null);
+      await expect(
+        service.create('t1', 'u1', sinTara({ numeroSacos: 20 })),
+      ).rejects.toThrow(/taraPorSacoKg/);
+    });
+
+    it('la tara calculada que deja peso neto <= 0 → 400', async () => {
+      const { service } = buildService();
+      await expect(
+        service.create('t1', 'u1', sinTara({ pesoBruto: 10, numeroSacos: 20 })),
+      ).rejects.toThrow(/peso neto/);
     });
   });
 

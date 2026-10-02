@@ -478,6 +478,7 @@ model ConfiguracionTenant {
   rendimientoMinAceptable Decimal? @db.Decimal(6, 2)
   rendimientoMaxAceptable Decimal? @db.Decimal(6, 2)
   saldoProveedorUmbral    Decimal? @db.Decimal(14, 2) // dispara notificación de saldo alto
+  taraPorSacoKg           Decimal? @db.Decimal(6, 3) // peso del saco vacío; tara = sacos × este valor
   updatedAt               DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -557,6 +558,8 @@ model Recepcion {
 
   pesoBruto Decimal @db.Decimal(10, 2)
   pesoTara  Decimal @db.Decimal(10, 2)
+  // Sacos recibidos; con ellos la tara se calcula (sacos × taraPorSacoKg).
+  numeroSacos Int?
   pesoNeto  Decimal @db.Decimal(10, 2)
 
   tablaPrecioTramoId String? // null para PASILLA (precio directo)

@@ -1,7 +1,9 @@
 import { Type } from 'class-transformer';
 import {
   IsEnum,
+  IsInt,
   IsNumber,
+  IsOptional,
   IsPositive,
   IsString,
   Min,
@@ -25,9 +27,16 @@ export class CreateRecepcionDto {
   @IsPositive()
   pesoBruto: number;
 
+  // Si se omite, se calcula como numeroSacos × ConfiguracionTenant.taraPorSacoKg.
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  pesoTara: number;
+  pesoTara?: number;
+
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  numeroSacos?: number;
 
   // Solo PERGAMINO lleva análisis de calidad (humedad + factor de
   // rendimiento): es café que el proveedor ya secó por su cuenta. El mojado
