@@ -13,6 +13,7 @@ interface ConfiguracionTenant {
   humedadMaxAceptable: string | number;
   taraPorSacoKg: string | number | null;
   esAgenteRetencion: boolean;
+  modoCompraPergamino: 'CALIDAD' | 'PRECIO_DIRECTO';
 }
 
 const num = (texto: string) => {
@@ -28,6 +29,7 @@ export function RecepcionConfig() {
   const [humedadMin, setHumedadMin] = useState('10');
   const [humedadMax, setHumedadMax] = useState('12');
   const [esAgente, setEsAgente] = useState(false);
+  const [modoSeco, setModoSeco] = useState<'CALIDAD' | 'PRECIO_DIRECTO'>('CALIDAD');
   const [mensaje, setMensaje] = useState<{ ok: boolean; texto: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -40,6 +42,7 @@ export function RecepcionConfig() {
           setHumedadMax(String(Number(c.humedadMaxAceptable)));
           setTaraPorSaco(c.taraPorSacoKg ? String(Number(c.taraPorSacoKg)) : '');
           setEsAgente(c.esAgenteRetencion);
+          setModoSeco(c.modoCompraPergamino);
         }
       })
       .catch(() => {})
@@ -63,6 +66,7 @@ export function RecepcionConfig() {
         humedadMinAceptable: min,
         humedadMaxAceptable: max,
         esAgenteRetencion: esAgente,
+        modoCompraPergamino: modoSeco,
       });
       setMensaje({ ok: true, texto: 'Guardado' });
     } catch (err) {
@@ -82,6 +86,33 @@ export function RecepcionConfig() {
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <fieldset className="flex flex-col gap-2 rounded-md border p-3">
+            <legend className="px-1 text-sm font-medium">Cuando compro café seco</legend>
+            {(
+              [
+                ['PRECIO_DIRECTO', 'Pago un precio por kilo', 'Escribo el precio acordado. No mido humedad ni factor.'],
+                ['CALIDAD', 'Mido humedad y factor', 'El precio sale de la tabla de precios del día.'],
+              ] as const
+            ).map(([valor, titulo, ayuda]) => (
+              <label key={valor} className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="radio"
+                  name="modo-seco"
+                  checked={modoSeco === valor}
+                  onChange={() => setModoSeco(valor)}
+                  disabled={!cargado}
+                  className="mt-1 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]"
+                />
+                <span>
+                  <span className="block text-sm font-medium">{titulo}</span>
+                  <span className="block text-xs text-muted-foreground">{ayuda}</span>
+                </span>
+              </label>
+            ))}
+            <p className="text-xs text-muted-foreground">
+              Es lo que aparece por defecto; en cada compra puedes cambiarlo.
+            </p>
+          </fieldset>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="cfg-tara">Peso del saco vacío (kg)</Label>
             <Input

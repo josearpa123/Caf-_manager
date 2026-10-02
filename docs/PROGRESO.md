@@ -4,6 +4,16 @@
 
 **Última actualización:** 2026-10-01
 
+## Café seco por calidad o a precio por kilo (sesión 2026-10-01, tras revisar el sistema en local)
+
+Comentario del usuario al revisar: no todos los compradores miden humedad y factor; muchos solo pagan un precio por kilo. También: el sistema se ve complejo, sobre todo el menú con tantos módulos, y quiere un manual al final.
+
+- **Decisión (del usuario)**: opción del negocio + interruptor en cada compra.
+- **Backend**: `POST /recepcion` acepta pergamino con `analisisCalidad` (precio de la tabla del día, como antes) **o** con `precioKg` (precio directo); ambos a la vez → 400. Nueva opción `ConfiguracionTenant.modoCompraPergamino` (`CALIDAD` por defecto | `PRECIO_DIRECTO`), migración `20261002120000_modo_compra_pergamino`, expuesta en `GET /recepcion/contexto` y `PATCH /tenants/me/configuracion`. El pergamino a precio directo no crea análisis ni usa tramo, entra al inventario de pergamino y retiene igual que el de calidad. Los reportes ya tomaban el análisis como opcional.
+- **Web**: en café seco, interruptor "Por calidad / A precio por kilo" con el valor inicial de la configuración; en modo precio desaparecen humedad, muestra, almendra y factor. Configuración: grupo "Cuando compro café seco".
+- **Pruebas**: 9 unitarias y 4 de validación del DTO, 1 de integración con PostgreSQL real; navegador (390 px): precio por kilo $18.000 × 100 kg = $1.800.000 (REC-2026-000024) y el interruptor por compra. API: 175 unitarias aprox. y 39 de integración.
+- **Siguen pendientes de este comentario**: simplificar el menú (módulos ocultables y agrupados) y el manual (Ayuda dentro del sistema + documento en el repo).
+
 ## Sprint 2 · PR 1 — zona horaria de Colombia y retención en la fuente, cierra H5 (sesión 2026-10-01)
 
 Rama `feat/zona-horaria-y-retencion`, apilada sobre `feat/recepcion-rapida-web` (PR #8). Decisiones del usuario: zona horaria fija America/Bogota; retención opcional (la activa el comprador en Configuración) y solo por recepción; **yo investigo y aplico los valores tributarios**. Detalle en `docs/adr/009-zona-horaria-y-retencion.md`.

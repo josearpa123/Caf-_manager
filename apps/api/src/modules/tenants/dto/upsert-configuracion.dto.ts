@@ -1,4 +1,11 @@
-import { IsBoolean, IsNumber, IsOptional, IsPositive } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+} from 'class-validator';
+import { ModoCompraPergamino } from '@prisma/client';
 
 export class UpsertConfiguracionDto {
   @IsNumber()
@@ -29,4 +36,10 @@ export class UpsertConfiguracionDto {
   @IsOptional()
   @IsBoolean()
   esAgenteRetencion?: boolean;
+
+  // Cómo compra café seco este negocio por defecto: midiendo humedad y factor,
+  // o a un precio por kilo. En cada compra se puede cambiar.
+  @IsOptional()
+  @IsEnum(ModoCompraPergamino)
+  modoCompraPergamino?: ModoCompraPergamino;
 }

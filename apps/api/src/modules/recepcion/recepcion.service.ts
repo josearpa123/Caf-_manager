@@ -109,12 +109,17 @@ export class RecepcionService {
         orderBy: { nombre: 'asc' },
       }),
       this.prisma.configuracionTenant.findFirst({
-        select: { taraPorSacoKg: true, esAgenteRetencion: true },
+        select: {
+          taraPorSacoKg: true,
+          esAgenteRetencion: true,
+          modoCompraPergamino: true,
+        },
       }),
     ]);
     return {
       puntosCompra: puntos,
       puntoCompraIdPorDefecto: puntos.length === 1 ? puntos[0].id : null,
+      modoCompraPergamino: config?.modoCompraPergamino ?? 'CALIDAD',
       taraPorSacoKg: config?.taraPorSacoKg
         ? Number(config.taraPorSacoKg)
         : null,
@@ -307,7 +312,18 @@ export class RecepcionService {
     let tablaPrecioTramoId: string | null = null;
     let factorRendimiento: number | null = null;
 
-    if (dto.tipoCafe === TipoCafeRecepcion.PERGAMINO) {
+    // Café seco: por calidad (humedad y factor, precio de la tabla del día) o a
+    // precio directo por kilo, como lo compran quienes no miden la calidad.
+    const porCalidad =
+      dto.tipoCafe === TipoCafeRecepcion.PERGAMINO &&
+      dto.analisisCalidad !== undefined;
+    if (porCalidad && dto.precioKg !== undefined) {
+      throw new BadRequestException(
+        'Indica la calidad (humedad y factor) o el precio por kilo, no ambos',
+      );
+    }
+
+    if (porCalidad) {
       const analisis = dto.analisisCalidad!;
       factorRendimiento = this.resolverFactorRendimiento(analisis);
 
@@ -325,13 +341,13 @@ export class RecepcionService {
       precioKg = Number(tramo.precioKg);
       tablaPrecioTramoId = tramo.id;
     } else {
-      // MOJADO y PASILLA: precio directo negociado, sin análisis de calidad.
+      // MOJADO, PASILLA y pergamino a precio directo: sin análisis de calidad.
       // El mojado recién lavado no se mide con el rango de humedad de la
       // tabla de precios (ese rango es de café seco); su valor real se sabe
       // después, al secarlo y trillarlo en Bodega.
       if (!dto.precioKg) {
         throw new BadRequestException(
-          'Se requiere precioKg para recepciones de mojado o pasilla',
+          'Se requiere precioKg para recepciones de mojado, pasilla o pergamino a precio por kilo',
         );
       }
       precioKg = dto.precioKg;
@@ -395,7 +411,7 @@ export class RecepcionService {
           },
         });
 
-        if (dto.tipoCafe === TipoCafeRecepcion.PERGAMINO) {
+        if (porCalidad) {
           const analisis = dto.analisisCalidad!;
           const analisisCalidad = await tx.analisisCalidad.create({
             data: {

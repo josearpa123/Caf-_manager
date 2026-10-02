@@ -135,6 +135,8 @@ export default function RecepcionRapidaPage() {
   const [factorManual, setFactorManual] = useState('');
   const [usarFactorManual, setUsarFactorManual] = useState(false);
   const [precioDirecto, setPrecioDirecto] = useState('');
+  // Café seco: por calidad (humedad y factor) o a precio por kilo.
+  const [modoSeco, setModoSeco] = useState<'CALIDAD' | 'PRECIO_DIRECTO'>('CALIDAD');
 
   const [precio, setPrecio] = useState<PrecioVigente | null | 'cargando'>(null);
   const [retencion, setRetencion] = useState<RetencionPrevia | null>(null);
@@ -147,6 +149,7 @@ export default function RecepcionRapidaPage() {
       .get<RecepcionContexto>('/recepcion/contexto')
       .then((c) => {
         setCtx(c);
+        setModoSeco(c.modoCompraPergamino);
         if (c.puntoCompraIdPorDefecto) setPuntoCompraId(c.puntoCompraIdPorDefecto);
       })
       .catch((e) =>
@@ -178,9 +181,12 @@ export default function RecepcionRapidaPage() {
   })();
   const humedadNum = num(humedad);
 
+  // Mojado, pasilla y el café seco "a precio por kilo" llevan el precio digitado.
+  const usaPrecioDirecto = tipo !== 'PERGAMINO' || modoSeco === 'PRECIO_DIRECTO';
+
   // Precio en vivo para pergamino: misma búsqueda que el guardado.
   useEffect(() => {
-    if (tipo !== 'PERGAMINO' || !puntoCompraId || !Number.isFinite(humedadNum) || !Number.isFinite(factor)) {
+    if (usaPrecioDirecto || !puntoCompraId || !Number.isFinite(humedadNum) || !Number.isFinite(factor)) {
       setPrecio(null);
       return;
     }
@@ -201,10 +207,14 @@ export default function RecepcionRapidaPage() {
       vigente = false;
       clearTimeout(t);
     };
-  }, [tipo, puntoCompraId, humedadNum, factor]);
+  }, [usaPrecioDirecto, puntoCompraId, humedadNum, factor]);
 
   const precioKg =
-    tipo === 'PERGAMINO' ? (precio && precio !== 'cargando' ? precio.precioKg : NaN) : num(precioDirecto);
+    usaPrecioDirecto
+      ? num(precioDirecto)
+      : precio && precio !== 'cargando'
+        ? precio.precioKg
+        : NaN;
   const valorTotal = Number.isFinite(neto) && Number.isFinite(precioKg) ? redondear2(neto * precioKg) : NaN;
 
   // Retención en vivo (solo si el negocio es agente): misma regla del guardado.
@@ -297,7 +307,7 @@ export default function RecepcionRapidaPage() {
     if (Number.isInteger(s) && s > 0) payload.numeroSacos = s;
     if (editarTara || !taraPorSaco) payload.pesoTara = tara;
 
-    if (tipo === 'PERGAMINO') {
+    if (!usaPrecioDirecto) {
       if (!Number.isFinite(humedadNum)) return setError('Escribe la humedad');
       if (!Number.isFinite(factor)) {
         return setError(
@@ -532,7 +542,41 @@ export default function RecepcionRapidaPage() {
           )}
         </section>
 
-        {tipo === 'PERGAMINO' ? (
+        {tipo === 'PERGAMINO' && (
+          <section aria-label="Cómo compras el café seco" className="flex flex-col gap-1.5">
+            <Label>¿Cómo lo compras?</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  ['CALIDAD', 'Por calidad'],
+                  ['PRECIO_DIRECTO', 'A precio por kilo'],
+                ] as const
+              ).map(([valor, etiqueta]) => (
+                <button
+                  key={valor}
+                  type="button"
+                  onClick={() => setModoSeco(valor)}
+                  aria-pressed={modoSeco === valor}
+                  className={cn(
+                    'min-h-11 rounded-md border px-2 text-sm transition-colors',
+                    modoSeco === valor
+                      ? 'border-primary bg-primary/10 font-medium text-primary'
+                      : 'border-input bg-background hover:bg-accent',
+                  )}
+                >
+                  {etiqueta}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {modoSeco === 'CALIDAD'
+                ? 'Mides humedad y factor y el precio sale de la tabla del día.'
+                : 'Escribes el precio por kilo que acordaste, sin medir calidad.'}
+            </p>
+          </section>
+        )}
+
+        {!usaPrecioDirecto ? (
           <section className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-3">
               <Campo id="rr-humedad" etiqueta="Humedad" sufijo="%" valor={humedad} onChange={setHumedad} />
@@ -596,7 +640,7 @@ export default function RecepcionRapidaPage() {
             <div>
               <p className="text-muted-foreground">Precio/kg</p>
               <p className="text-lg font-semibold">
-                {precio === 'cargando' && tipo === 'PERGAMINO'
+                {precio === 'cargando' && !usaPrecioDirecto
                   ? '…'
                   : Number.isFinite(precioKg)
                     ? COP.format(precioKg)
@@ -624,7 +668,7 @@ export default function RecepcionRapidaPage() {
               </div>
             </div>
           )}
-          {tipo === 'PERGAMINO' && precio === null && Number.isFinite(factor) && Number.isFinite(humedadNum) && (
+          {!usaPrecioDirecto && precio === null && Number.isFinite(factor) && Number.isFinite(humedadNum) && (
             <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
               No hay tramo de precio para esta calidad. Registra el precio del día en Precios.
             </p>

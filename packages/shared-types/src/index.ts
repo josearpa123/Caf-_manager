@@ -168,6 +168,8 @@ export interface RecepcionContexto {
   taraPorSacoKg: number | null;
   // Si es true, las compras de pergamino y mojado retienen en la fuente.
   esAgenteRetencion: boolean;
+  // Forma habitual de comprar café seco en este negocio.
+  modoCompraPergamino: 'CALIDAD' | 'PRECIO_DIRECTO';
 }
 
 // GET /recepcion/retencion: vista previa con la misma regla del guardado.

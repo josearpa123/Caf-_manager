@@ -283,6 +283,74 @@ describe('RecepcionService', () => {
     });
   });
 
+  describe('create · pergamino a precio directo por kilo', () => {
+    const directo = (
+      extra: Partial<CreateRecepcionDto> = {},
+    ): CreateRecepcionDto => ({
+      puntoCompraId: 'pc1',
+      proveedorId: 'p1',
+      tipoCafe: TipoCafeRecepcion.PERGAMINO,
+      pesoBruto: 110,
+      pesoTara: 10,
+      precioKg: 18000,
+      ...extra,
+    });
+
+    it('sin análisis de calidad usa el precio digitado, sin tabla de precios ni análisis', async () => {
+      const { service, tx, tablaPrecios } = buildService();
+      await service.create('t1', 'u1', directo());
+      expect(dataCreada(tx)).toMatchObject({
+        tipoCafe: TipoCafeRecepcion.PERGAMINO,
+        precioKg: 18000,
+        valorTotal: 1800000,
+        tablaPrecioTramoId: null,
+      });
+      expect(tablaPrecios.findMatch).not.toHaveBeenCalled();
+      expect(tx.analisisCalidad.create).not.toHaveBeenCalled();
+    });
+
+    it('entra al inventario de pergamino igual que el de calidad', async () => {
+      const { service, tx } = buildService();
+      await service.create('t1', 'u1', directo());
+      expect(
+        tx.movimientoInventario.create.mock.calls[0][0].data,
+      ).toMatchObject({
+        tipoCafe: TipoInventario.PERGAMINO,
+        cantidadKg: 100,
+      });
+    });
+
+    it('calidad y precio a la vez → 400 (hay que elegir uno)', async () => {
+      const { service, prisma } = buildService();
+      await expect(
+        service.create('t1', 'u1', pergamino({ precioKg: 18000 })),
+      ).rejects.toThrow(/no ambos/);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('ni calidad ni precio → 400', async () => {
+      const { service } = buildService();
+      await expect(
+        service.create('t1', 'u1', directo({ precioKg: undefined })),
+      ).rejects.toThrow(/precioKg/);
+    });
+
+    it('la retención también aplica al pergamino a precio directo', async () => {
+      const b = buildService();
+      b.prisma.configuracionTenant.findFirst.mockResolvedValue({
+        taraPorSacoKg: 0.5,
+        esAgenteRetencion: true,
+      });
+      // 200 kg × $20.000 = $4.000.000 ≥ 70 UVT
+      await b.service.create(
+        't1',
+        'u1',
+        directo({ pesoBruto: 210, precioKg: 20000 }),
+      );
+      expect(String(dataCreada(b.tx).valorRetencion)).toBe('20000');
+    });
+  });
+
   describe('create · día de Colombia', () => {
     it('a las 8:30 p. m. en Bogotá busca el precio del día de Bogotá, no el de UTC', async () => {
       jest.useFakeTimers().setSystemTime(new Date('2026-10-02T01:30:00Z'));
@@ -682,6 +750,7 @@ describe('RecepcionService', () => {
         puntoCompraIdPorDefecto: 'pc1',
         taraPorSacoKg: 0.5,
         esAgenteRetencion: false,
+        modoCompraPergamino: 'CALIDAD',
       });
     });
 
