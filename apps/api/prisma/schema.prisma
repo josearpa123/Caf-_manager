@@ -480,6 +480,9 @@ model ConfiguracionTenant {
   saldoProveedorUmbral    Decimal?            @db.Decimal(14, 2) // dispara notificación de saldo alto
   taraPorSacoKg           Decimal?            @db.Decimal(6, 3) // peso del saco vacío; tara = sacos × este valor
   esAgenteRetencion       Boolean             @default(false) // si es true, las compras de café retienen en la fuente
+  // Módulos que este negocio decidió no ver en el menú (solo visual: no cambia
+  // permisos ni el plan; la URL sigue funcionando).
+  modulosOcultos          Modulo[]            @default([])
   modoCompraPergamino     ModoCompraPergamino @default(CALIDAD) // forma habitual de comprar café seco
   updatedAt               DateTime            @updatedAt
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogOut, Menu, type LucideIcon } from 'lucide-react';
@@ -14,6 +14,8 @@ export interface AppShellNavItem {
   icon: LucideIcon;
   badge?: number;
   exact?: boolean;
+  // Título de grupo del menú; se muestra cuando cambia respecto al ítem anterior.
+  section?: string;
 }
 
 interface AppShellProps {
@@ -102,42 +104,55 @@ export function AppShell({
         </div>
 
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
-          {navItems.map((item) => {
+          {navItems.map((item, i) => {
+            const nuevaSeccion =
+              !!item.section && item.section !== navItems[i - 1]?.section;
             const active = item.exact
               ? pathname === item.href
               : pathname === item.href || pathname?.startsWith(`${item.href}/`);
             const Icon = item.icon;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors duration-150',
-                  active
-                    ? 'bg-primary/10 font-medium text-primary'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+              <Fragment key={item.href}>
+                {nuevaSeccion && (
+                  <p
+                    className={cn(
+                      'px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80',
+                      i === 0 ? 'pt-0' : 'pt-4',
+                    )}
+                  >
+                    {item.section}
+                  </p>
                 )}
-              >
-                <span
+                <Link
+                  href={item.href}
                   className={cn(
-                    'absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-primary transition-opacity duration-150',
-                    active ? 'opacity-100' : 'opacity-0',
+                    'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors duration-150',
+                    active
+                      ? 'bg-primary/10 font-medium text-primary'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                   )}
-                  aria-hidden="true"
-                />
-                <Icon
-                  className={cn(
-                    'h-4 w-4 shrink-0 transition-colors',
-                    active ? 'text-primary' : 'text-muted-foreground/80 group-hover:text-foreground',
+                >
+                  <span
+                    className={cn(
+                      'absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-primary transition-opacity duration-150',
+                      active ? 'opacity-100' : 'opacity-0',
+                    )}
+                    aria-hidden="true"
+                  />
+                  <Icon
+                    className={cn(
+                      'h-4 w-4 shrink-0 transition-colors',
+                      active ? 'text-primary' : 'text-muted-foreground/80 group-hover:text-foreground',
+                    )}
+                  />
+                  <span className="flex-1 truncate">{item.label}</span>
+                  {!!item.badge && (
+                    <Badge variant="primary" className="h-5 min-w-5 justify-center px-1.5">
+                      {item.badge}
+                    </Badge>
                   )}
-                />
-                <span className="flex-1 truncate">{item.label}</span>
-                {!!item.badge && (
-                  <Badge variant="primary" className="h-5 min-w-5 justify-center px-1.5">
-                    {item.badge}
-                  </Badge>
-                )}
-              </Link>
+                </Link>
+              </Fragment>
             );
           })}
         </nav>

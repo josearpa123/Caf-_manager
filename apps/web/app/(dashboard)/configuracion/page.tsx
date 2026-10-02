@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
 import { RecepcionConfig } from '@/components/configuracion/recepcion-config';
+import { MenuConfig } from '@/components/configuracion/menu-config';
 
 const SECCIONES = [
   {
@@ -77,6 +78,7 @@ export default function ConfiguracionPage() {
       )}
 
       <RecepcionConfig />
+      <MenuConfig />
 
       <div className="mt-6 grid max-w-xl gap-4">
         {SECCIONES.map((s) => (

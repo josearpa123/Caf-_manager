@@ -9,6 +9,12 @@ import { UpsertConfiguracionDto } from './dto/upsert-configuracion.dto';
 export class ConfiguracionController {
   constructor(private readonly configuracionService: ConfiguracionService) {}
 
+  // Sin permiso especial: el menú lo necesitan todos los usuarios.
+  @Get('menu')
+  getMenu(@CurrentUser('tenantId') tenantId: string) {
+    return this.configuracionService.getMenu(tenantId);
+  }
+
   @RequirePermissions(Permission.CONFIGURACION_EMPRESA_GESTIONAR)
   @Get()
   get(@CurrentUser('tenantId') tenantId: string) {
