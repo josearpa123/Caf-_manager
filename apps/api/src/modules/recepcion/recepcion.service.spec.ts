@@ -145,7 +145,7 @@ describe('RecepcionService', () => {
     });
 
     it('una tara digitada manda sobre el cálculo por sacos', async () => {
-      const { service, prisma, tx } = buildService();
+      const { service, tx } = buildService();
       await service.create(
         't1',
         'u1',
