@@ -546,6 +546,47 @@ describe('RecepcionService', () => {
     });
   });
 
+  describe('contexto (recepción rápida)', () => {
+    const conPuntos = (puntos: { id: string; nombre: string }[]) => {
+      const b = buildService();
+      (b.prisma as any).puntoCompra.findMany = jest
+        .fn()
+        .mockResolvedValue(puntos);
+      return b;
+    };
+
+    it('un solo punto: queda como valor por defecto, y trae el peso del saco', async () => {
+      const { service } = conPuntos([{ id: 'pc1', nombre: 'Central' }]);
+      expect(await service.contexto(null)).toEqual({
+        puntosCompra: [{ id: 'pc1', nombre: 'Central' }],
+        puntoCompraIdPorDefecto: 'pc1',
+        taraPorSacoKg: 0.5,
+      });
+    });
+
+    it('varios puntos: sin valor por defecto', async () => {
+      const { service } = conPuntos([
+        { id: 'a', nombre: 'A' },
+        { id: 'b', nombre: 'B' },
+      ]);
+      expect((await service.contexto(null)).puntoCompraIdPorDefecto).toBeNull();
+    });
+
+    it('usuario asignado a un punto: solo consulta ese punto', async () => {
+      const { service, prisma } = conPuntos([{ id: 'pc1', nombre: 'Central' }]);
+      await service.contexto('pc1');
+      expect(
+        (prisma as any).puntoCompra.findMany.mock.calls[0][0].where,
+      ).toEqual({ activo: true, id: 'pc1' });
+    });
+
+    it('sin peso del saco configurado devuelve null', async () => {
+      const { service, prisma } = conPuntos([{ id: 'pc1', nombre: 'C' }]);
+      prisma.configuracionTenant.findFirst.mockResolvedValue(null);
+      expect((await service.contexto(null)).taraPorSacoKg).toBeNull();
+    });
+  });
+
   describe('findAll / findOne', () => {
     it('findAll arma filtros y rango de fechas (hasta inclusivo)', async () => {
       const { service, prisma } = buildService();
