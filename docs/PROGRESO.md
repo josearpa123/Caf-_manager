@@ -4,6 +4,32 @@
 
 **Última actualización:** 2026-10-01
 
+## Sprint 1 · PR 5 — pantalla de recepción rápida, cierra H3 en código (sesión 2026-10-01)
+
+Rama `feat/recepcion-rapida-web`, apilada sobre `feat/recepcion-rapida-backend` (PR #7). Captura: `docs/img/recepcion-rapida-movil.png` (datos ficticios de la simulación).
+
+- **Cubre**: H3, RF-02, CU-01 pasos 1–5 y 7–9 (guardar; el recibo térmico y el pago en el mismo paso son del Sprint 2), flujo 2a (alta exprés), 5b/7a parcial.
+- **Decisiones de diseño** (acordadas como recomendación, el usuario dijo "sigue"): una sola pantalla; muestra solo precio y total (la retención es del Sprint 2); alta exprés en diálogo.
+- **`/recepcion/rapida`** (el botón "Nueva recepción" del listado ahora va aquí; `/recepcion/nueva` sigue como "Formulario completo"):
+  - Buscador de proveedor con resultados mientras se escribe (cédula, nombre o apodo, sin tildes), flechas + Enter; última opción "Nuevo proveedor" que abre el **alta exprés** con lo escrito ya repartido (número o nombre) y deja el cursor en el peso.
+  - Valores por defecto: punto de compra (si hay uno), tipo de café de la última recepción del proveedor, tara por sacos.
+  - **Enter avanza al siguiente campo y en el último guarda**; teclado decimal en celular; acepta coma decimal.
+  - Precio y total en vivo para pergamino (`GET /tabla-precios/precio`); aviso si no hay tramo; mojado/pasilla piden precio directo; factor calculado o digitado.
+  - **`Idempotency-Key`** en el guardado: mismo cuerpo reintenta con la misma llave (si se corta la señal no se duplica); cuerpo editado, llave nueva. Pantalla de resultado con código y "Nueva recepción".
+- **`GET /recepcion/contexto`** (permiso `RECEPCION_CREAR`): puntos de compra, punto por defecto y peso del saco; el operador no necesita permisos de configuración. 4 pruebas unitarias.
+- **Menú responsive** (`AppShell`): en pantallas chicas la barra lateral es un cajón con botón de hamburguesa. **Antes de este cambio el panel completo era inusable en celular** (la barra de 256 px dejaba ~130 px de contenido); afecta a todas las pantallas y a la plataforma de super-admin, que usan el mismo shell.
+- **Configuración**: tarjeta "Recepción" para fijar el peso del saco y el rango de humedad (la web no tenía ningún formulario de `tenants/me/configuracion`).
+- **Verificación**: probado en Edge headless (390 px, `puppeteer-core` desde una carpeta temporal; no se agregó ninguna dependencia al repo; la extensión de Chrome no estaba conectada): flujo completo proveedor → pesos → humedad/muestra → guardar (REC-2026-000019 y 000020 en la BD **local** de simulación; contraseña de demostración reseteada para `admin1@cooperativalosandessim.test`, no se versiona), alta exprés, búsqueda por apodo y sin tildes, y la tarjeta de configuración. Sin errores de consola. El flujo automatizado tarda ~1,9 s; **los 45 s del criterio de cierre hay que medirlos con una persona y cronómetro** (10 veces seguidas en celular).
+- API: 140 unitarias; `next build` y lint de la web limpios.
+
+### Pendiente / fuera de alcance
+- Medición con cronómetro (criterio de cierre del Sprint 1) y ajustes que salgan de ahí.
+- La web no tiene pruebas automatizadas (no hay framework instalado); esta pantalla se verificó a mano con el navegador. Proponer Playwright (dependencia nueva, requiere tu aprobación).
+- Defectos de calidad y observaciones no están en la pantalla rápida (siguen en el formulario completo).
+- Pagos, anticipos y ventas de la web aún no envían `Idempotency-Key`.
+- El formulario de proveedores no tiene campo `apodo`.
+- Sin detección de recepción duplicada "parecida" (mismo proveedor, mismo peso, minutos de diferencia) más allá de la llave.
+
 ## Sprint 1 · PR 4 — backend de la recepción rápida: tara por sacos y vista previa de precio (sesión 2026-10-01)
 
 Rama `feat/recepcion-rapida-backend`, apilada sobre `feat/busqueda-proveedor` (PR #6).

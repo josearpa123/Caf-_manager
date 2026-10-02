@@ -27,6 +27,15 @@ export class RecepcionController {
     return this.recepcionService.findAll(query);
   }
 
+  // Todo lo que la pantalla de recepción rápida necesita al abrir, para que el
+  // operador no requiera permisos de configuración ni de puntos de compra.
+  // Antes de ':id' para que 'contexto' no se tome como un id.
+  @RequirePermissions(Permission.RECEPCION_CREAR)
+  @Get('contexto')
+  contexto(@CurrentUser('puntoCompraId') puntoCompraId: string | null) {
+    return this.recepcionService.contexto(puntoCompraId);
+  }
+
   @RequirePermissions(Permission.RECEPCION_VER)
   @Get(':id')
   findOne(@Param('id') id: string) {

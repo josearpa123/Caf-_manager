@@ -83,6 +83,32 @@ export class RecepcionService {
     });
   }
 
+  // Datos para abrir la recepción rápida: puntos de compra activos que el usuario
+  // puede usar (solo el suyo si está asignado a uno), el peso del saco para
+  // calcular la tara y el punto por defecto.
+  async contexto(puntoCompraIdUsuario: string | null) {
+    const [puntos, config] = await Promise.all([
+      this.prisma.puntoCompra.findMany({
+        where: {
+          activo: true,
+          ...(puntoCompraIdUsuario ? { id: puntoCompraIdUsuario } : {}),
+        },
+        select: { id: true, nombre: true },
+        orderBy: { nombre: 'asc' },
+      }),
+      this.prisma.configuracionTenant.findFirst({
+        select: { taraPorSacoKg: true },
+      }),
+    ]);
+    return {
+      puntosCompra: puntos,
+      puntoCompraIdPorDefecto: puntos.length === 1 ? puntos[0].id : null,
+      taraPorSacoKg: config?.taraPorSacoKg
+        ? Number(config.taraPorSacoKg)
+        : null,
+    };
+  }
+
   async findOne(id: string) {
     const recepcion = await this.prisma.recepcion.findUnique({
       where: { id },

@@ -50,7 +50,7 @@ export default function RecepcionPage() {
             <Link href="/recepcion/precios" className={buttonVariants({ variant: 'outline' })}>
               Tabla de precios
             </Link>
-            <Link href="/recepcion/nueva" className={buttonVariants()}>
+            <Link href="/recepcion/rapida" className={buttonVariants()}>
               Nueva recepción
             </Link>
           </div>
