@@ -258,6 +258,7 @@ model Tenant {
   resolucionesFacturacion ResolucionFacturacion[]
   recepciones             Recepcion[]
   consecutivos            Consecutivo[]
+  idempotencyKeys         IdempotencyKey[]
   procesosSecado          ProcesoSecado[]
   procesosTrilla          TrillaProceso[]
   movimientosInventario   MovimientoInventario[]
@@ -1133,4 +1134,22 @@ model Consecutivo {
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@id([tenantId, tipo, anio])
+}
+
+// Llave de idempotencia por tenant y operación: un reintento con la misma llave
+// no duplica la escritura de plata (regla de dominio 6, ADR-007). Se reserva
+// dentro de la transacción de negocio; `recursoId` apunta al documento creado.
+model IdempotencyKey {
+  tenantId      String
+  alcance       String
+  llave         String
+  hashSolicitud String
+  recursoId     String?
+  createdAt     DateTime @default(now())
+  expiraEn      DateTime
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@id([tenantId, alcance, llave])
+  @@index([expiraEn])
 }

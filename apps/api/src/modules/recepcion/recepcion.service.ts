@@ -12,6 +12,13 @@ import {
   TipoMovimientoInventario,
 } from '@prisma/client';
 import { siguienteConsecutivo } from '../../prisma/consecutivo';
+import {
+  buscarResultadoIdempotente,
+  completarLlave,
+  hashSolicitud,
+  IdempotenciaDuplicada,
+  reservarLlave,
+} from '../../prisma/idempotencia';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { TablaPreciosService } from './tabla-precios.service';
@@ -42,6 +49,8 @@ const RECEPCION_LIST_INCLUDE = {
   proveedor: { select: { nombre: true } },
   puntoCompra: { select: { nombre: true } },
 } as const;
+
+const ALCANCE_IDEMPOTENCIA = 'RECEPCION';
 
 // Los tres tipos de café que se compran en recepción existen 1:1 como tipo
 // de inventario (ver TipoInventario en el schema).
@@ -138,7 +147,26 @@ export class RecepcionService {
     return analisis.factorRendimiento;
   }
 
-  async create(tenantId: string, createdById: string, dto: CreateRecepcionDto) {
+  // Con `llave` (encabezado Idempotency-Key) un reintento no duplica: devuelve
+  // la recepción ya creada por la primera petición (ADR-007).
+  async create(
+    tenantId: string,
+    createdById: string,
+    dto: CreateRecepcionDto,
+    llave?: string,
+  ) {
+    const hash = llave ? hashSolicitud(dto) : '';
+    if (llave) {
+      const previa = await buscarResultadoIdempotente(
+        this.prisma,
+        tenantId,
+        ALCANCE_IDEMPOTENCIA,
+        llave,
+        hash,
+      );
+      if (previa) return this.findOne(previa);
+    }
+
     await this.assertProveedorActivo(dto.proveedorId);
     await this.assertPuntoCompraActivo(dto.puntoCompraId);
 
@@ -198,6 +226,18 @@ export class RecepcionService {
       );
 
       return await this.prisma.$transaction(async (tx) => {
+        if (
+          llave &&
+          !(await reservarLlave(
+            tx,
+            tenantId,
+            ALCANCE_IDEMPOTENCIA,
+            llave,
+            hash,
+          ))
+        ) {
+          throw new IdempotenciaDuplicada();
+        }
         const recepcion = await tx.recepcion.create({
           data: {
             tenantId,
@@ -260,12 +300,33 @@ export class RecepcionService {
           }
         }
 
+        if (llave) {
+          await completarLlave(
+            tx,
+            tenantId,
+            ALCANCE_IDEMPOTENCIA,
+            llave,
+            recepcion.id,
+          );
+        }
+
         return tx.recepcion.findUniqueOrThrow({
           where: { id: recepcion.id },
           include: RECEPCION_DETAIL_INCLUDE,
         });
       });
     } catch (error) {
+      if (llave && error instanceof IdempotenciaDuplicada) {
+        // Otra petición con la misma llave confirmó mientras esta esperaba.
+        const previa = await buscarResultadoIdempotente(
+          this.prisma,
+          tenantId,
+          ALCANCE_IDEMPOTENCIA,
+          llave,
+          hash,
+        );
+        if (previa) return this.findOne(previa);
+      }
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2003'

@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return */
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   ModoFactorRendimiento,
   OrigenMovimientoInventario,
@@ -10,9 +14,12 @@ import {
 } from '@prisma/client';
 import { RecepcionService } from './recepcion.service';
 import { CreateRecepcionDto } from './dto/create-recepcion.dto';
+import { hashSolicitud } from '../../prisma/idempotencia';
 
 function buildTx() {
   return {
+    $queryRaw: jest.fn().mockResolvedValue([{ llave: 'llave-1234' }]),
+    $executeRaw: jest.fn().mockResolvedValue(1),
     recepcion: {
       create: jest.fn().mockResolvedValue({ id: 'rec-1' }),
       findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'rec-1' }),
@@ -397,6 +404,73 @@ describe('RecepcionService', () => {
       await expect(service.create('t1', 'u1', pergamino())).rejects.toThrow(
         /punto de compra está inactivo/,
       );
+    });
+  });
+
+  describe('create · idempotencia (Idempotency-Key)', () => {
+    const LLAVE = 'llave-1234';
+
+    it('sin llave no toca la tabla de llaves', async () => {
+      const { service, tx } = buildService();
+      await service.create('t1', 'u1', pergamino());
+      expect(tx.$queryRaw).not.toHaveBeenCalled();
+      expect(tx.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('llave nueva: reserva dentro de la transacción y la completa con el id creado', async () => {
+      const { service, prisma, tx } = buildService();
+      prisma.$queryRaw
+        .mockResolvedValueOnce([]) // buscar: llave nueva
+        .mockResolvedValueOnce([{ valorActual: 1 }]); // consecutivo
+      await service.create('t1', 'u1', pergamino(), LLAVE);
+      expect(tx.$queryRaw).toHaveBeenCalledTimes(1); // reservar, primera sentencia
+      expect(tx.$executeRaw).toHaveBeenCalledTimes(1); // completar
+      expect(tx.$executeRaw.mock.calls[0]).toContain('rec-1');
+      expect(tx.recepcion.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('reintento con la misma llave y cuerpo: devuelve la recepción previa sin crear nada', async () => {
+      const { service, prisma, tx } = buildService();
+      const dto = pergamino();
+      prisma.$queryRaw.mockResolvedValueOnce([
+        { hashSolicitud: hashSolicitud(dto), recursoId: 'rec-1' },
+      ]);
+      prisma.recepcion.findUnique.mockResolvedValue({ id: 'rec-1' });
+      const r = await service.create('t1', 'u1', dto, LLAVE);
+      expect(r).toEqual({ id: 'rec-1' });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(tx.recepcion.create).not.toHaveBeenCalled();
+      expect(prisma.proveedor.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('misma llave con otro cuerpo → 409 y no crea nada', async () => {
+      const { service, prisma, tx } = buildService();
+      prisma.$queryRaw.mockResolvedValueOnce([
+        {
+          hashSolicitud: hashSolicitud(pergamino({ pesoBruto: 50 })),
+          recursoId: 'rec-1',
+        },
+      ]);
+      await expect(
+        service.create('t1', 'u1', pergamino(), LLAVE),
+      ).rejects.toThrow(ConflictException);
+      expect(tx.recepcion.create).not.toHaveBeenCalled();
+    });
+
+    it('carrera: otra petición confirmó la misma llave → rollback y devuelve la ganadora', async () => {
+      const { service, prisma, tx } = buildService();
+      const dto = pergamino();
+      prisma.$queryRaw
+        .mockResolvedValueOnce([]) // buscar: aún no existía
+        .mockResolvedValueOnce([{ valorActual: 7 }]) // consecutivo (queda hueco)
+        .mockResolvedValueOnce([
+          { hashSolicitud: hashSolicitud(dto), recursoId: 'rec-9' },
+        ]); // buscar tras perder la carrera
+      tx.$queryRaw.mockResolvedValue([]); // reservar: ya existía vigente
+      prisma.recepcion.findUnique.mockResolvedValue({ id: 'rec-9' });
+      const r = await service.create('t1', 'u1', dto, LLAVE);
+      expect(r).toEqual({ id: 'rec-9' });
+      expect(tx.recepcion.create).not.toHaveBeenCalled();
     });
   });
 

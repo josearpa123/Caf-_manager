@@ -4,16 +4,22 @@
 
 **Última actualización:** 2026-10-01
 
-## Deploy solo manual hasta el Sprint 3 (sesión 2026-10-01)
+## Sprint 1 · PR 1 — idempotencia en recepciones, cierra H7 en el backend (sesión 2026-10-01)
 
-El workflow `Deploy` fallaba en cada push a `main` (`curl: (3) URL rejected`): llama al webhook de Coolify con `COOLIFY_WEBHOOK_URL` / `COOLIFY_API_TOKEN`, que no existen porque el servidor es del Sprint 3. Era ruido rojo en GitHub sin relación con el código.
+Rama `feat/idempotencia` (sobre `main` de GitHub, PR #2 ya fusionado).
 
-- **Fix**: `.github/workflows/deploy.yml` queda solo con `workflow_dispatch`; el trigger `push` a `main` está comentado con la instrucción de restaurarlo. Sin cambios de código ni dependencias.
-- El workflow `CI` no se tocó (verde en PR #1 y #2).
+- **Cubre**: H7, regla de dominio 6 (solo recepción por ahora), CU-01 flujo 7a, RNF-07.
+- **Decisión (del usuario)**: tabla genérica `IdempotencyKey` en vez de una columna en `Recepcion`; 409 con misma llave y otro cuerpo; vigencia 24 h. Detalle en `docs/adr/007-idempotencia-tabla-de-llaves.md`. **El plan de `TECNICO.md` decía `Recepcion.idempotencyKey`**: se corrigió el diccionario de datos y el MER.
+- **Schema**: migración aditiva `20261001120000_idempotency_keys` (tabla, índice por `expiraEn`, FK a `Tenant`); aplicada a las BD `coffee_manager` y `coffee_manager_test`. Modelo agregado a `TENANT_SCOPED_MODELS` (no va a `AUDITED_MODELS`: no mueve plata).
+- **Código**: `apps/api/src/prisma/idempotencia.ts` (validar llave, huella del cuerpo, buscar, reservar, completar); `POST /recepcion` lee el encabezado `Idempotency-Key` (opcional en el servidor). La reserva es lo primero dentro de la transacción de negocio: un duplicado concurrente espera al COMMIT/ROLLBACK del primero.
+- **Pruebas**: 17 unitarias del helper, 5 del servicio (sin llave, llave nueva, reintento, 409, carrera) y 7 de integración con PostgreSQL real (dos veces, 10 simultáneas, otro cuerpo, tenants distintos, vencida, rollback). API: 106 unitarias y 20 de integración en verde; `recepcion.service.ts` 100% líneas.
+- **Diagramas**: MER (entidad nueva, se quitó `Recepcion.idempotencyKey`) y secuencia de recepción (el consecutivo se asigna antes del `BEGIN`, como dice ADR-003).
 
 ### Pendiente / fuera de alcance
-- Sprint 3: crear los secretos en GitHub, montar Coolify y restaurar el trigger `push`.
-- Nota de entorno: el remoto `origin` es SSH y esta sesión no tiene llave; se usó `gh` y HTTPS. La `main` local tiene 1 commit viejo sin subir y está desalineada de `origin/main`.
+- Idempotencia en pagos, anticipos y ventas (mismo helper), PR siguiente.
+- La web aún no envía `Idempotency-Key` (va con la pantalla de recepción rápida).
+- Limpieza de llaves vencidas: cola BullMQ, Sprint 3.
+- Hallazgo de paso: el CLAUDE.md y TECNICO hablan de `POST /recepciones`, la ruta real es `POST /recepcion`.
 
 ## README renovado con capturas y hoja de ruta (sesión 2026-10-01)
 
