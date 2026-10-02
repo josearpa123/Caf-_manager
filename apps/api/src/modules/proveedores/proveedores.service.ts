@@ -58,8 +58,8 @@ export class ProveedoresService {
   // Búsqueda mientras se escribe (RF-02, p95 < 300 ms): cédula, nombre o apodo,
   // parcial o con errores de digitación, los más parecidos primero. Es un top-N
   // acotado (no un listado), por eso no lleva cursor. Solo proveedores activos
-  // del tenant. Usa los índices de trigramas; SQL explícito con el tenantId del
-  // JWT, nunca del cliente.
+  // del tenant. Ignora tildes y mayúsculas (unaccent + pg_trgm); SQL explícito con
+  // el tenantId del JWT, nunca del cliente.
   async buscar(
     tenantId: string,
     query: BuscarProveedoresDto,
@@ -80,11 +80,16 @@ export class ProveedoresService {
                ORDER BY r."fecha" DESC LIMIT 1) AS "ultimoTipoCafe"
       FROM "Proveedor" p
       WHERE p."tenantId" = ${tenantId} AND p."activo" = true
-        AND (p."nombre" ILIKE ${contiene} OR p."apodo" ILIKE ${contiene}
+        AND (unaccent(p."nombre") ILIKE unaccent(${contiene})
+             OR unaccent(coalesce(p."apodo", '')) ILIKE unaccent(${contiene})
              OR p."numeroIdentificacion" ILIKE ${contiene}
-             OR p."nombre" % ${q} OR p."apodo" % ${q})
+             OR unaccent(p."nombre") % unaccent(${q})
+             OR unaccent(coalesce(p."apodo", '')) % unaccent(${q}))
       ORDER BY (CASE WHEN p."numeroIdentificacion" ILIKE ${empieza} THEN 0 ELSE 1 END),
-               GREATEST(similarity(p."nombre", ${q}), similarity(coalesce(p."apodo", ''), ${q})) DESC,
+               GREATEST(
+                 similarity(unaccent(p."nombre"), unaccent(${q})),
+                 similarity(unaccent(coalesce(p."apodo", '')), unaccent(${q}))
+               ) DESC,
                p."nombre"
       LIMIT ${limit}`;
   }

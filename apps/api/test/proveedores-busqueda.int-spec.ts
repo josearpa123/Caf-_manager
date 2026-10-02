@@ -56,6 +56,19 @@ describe('Búsqueda de proveedores con pg_trgm (PostgreSQL real)', () => {
     expect(await nombres('zzzz')).toEqual([]);
   });
 
+  it('ignora las tildes en ambos sentidos', async () => {
+    const t = await crearTenant('tildes');
+    await t.proveedor('1', 'José Ramírez', { apodo: 'Papá Chuchú' });
+    await t.proveedor('2', 'Maria Lopez');
+    const nombres = async (q: string) =>
+      (await t.service.buscar(t.tenant.id, { q })).map((r) => r.nombre);
+
+    expect(await nombres('jose ramirez')).toEqual(['José Ramírez']);
+    expect(await nombres('JOSÉ')).toEqual(['José Ramírez']);
+    expect(await nombres('papa chuchu')).toEqual(['José Ramírez']);
+    expect(await nombres('maría lópez')).toEqual(['Maria Lopez']);
+  });
+
   it('tolera errores de digitación', async () => {
     const t = await crearTenant('typo');
     await t.proveedor('1', 'Hernando Ramírez');
