@@ -4,6 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import {
+  ejecutarConLlave,
+  type PasosIdempotencia,
+} from '../../prisma/idempotencia';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { CreateAnticipoDto } from './dto/create-anticipo.dto';
@@ -13,6 +17,8 @@ const ANTICIPO_LIST_INCLUDE = {
   proveedor: { select: { nombre: true } },
   puntoCompra: { select: { nombre: true } },
 } as const;
+
+const ALCANCE_IDEMPOTENCIA = 'ANTICIPO';
 
 @Injectable()
 export class AnticiposService {
@@ -85,22 +91,51 @@ export class AnticiposService {
       throw new BadRequestException('El punto de compra está inactivo');
   }
 
-  async create(tenantId: string, createdById: string, dto: CreateAnticipoDto) {
+  // Con `llave` (encabezado Idempotency-Key) un reintento no duplica el
+  // anticipo (regla de dominio 6, ADR-007).
+  create(
+    tenantId: string,
+    createdById: string,
+    dto: CreateAnticipoDto,
+    llave?: string,
+  ) {
+    return ejecutarConLlave({
+      db: this.prisma,
+      tenantId,
+      alcance: ALCANCE_IDEMPOTENCIA,
+      llave,
+      cuerpo: dto,
+      obtener: (id) => this.findOne(id),
+      ejecutar: (pasos) => this.crear(tenantId, createdById, dto, pasos),
+    });
+  }
+
+  private async crear(
+    tenantId: string,
+    createdById: string,
+    dto: CreateAnticipoDto,
+    pasos: PasosIdempotencia,
+  ) {
     await this.assertProveedorActivo(dto.proveedorId);
     await this.assertPuntoCompraActivo(dto.puntoCompraId);
 
-    return this.prisma.anticipo.create({
-      data: {
-        tenantId,
-        proveedorId: dto.proveedorId,
-        puntoCompraId: dto.puntoCompraId,
-        monto: dto.monto,
-        metodoPago: dto.metodoPago,
-        referencia: dto.referencia,
-        notas: dto.notas,
-        createdById,
-      },
-      include: ANTICIPO_LIST_INCLUDE,
+    return this.prisma.$transaction(async (tx) => {
+      await pasos.reservar(tx);
+      const anticipo = await tx.anticipo.create({
+        data: {
+          tenantId,
+          proveedorId: dto.proveedorId,
+          puntoCompraId: dto.puntoCompraId,
+          monto: dto.monto,
+          metodoPago: dto.metodoPago,
+          referencia: dto.referencia,
+          notas: dto.notas,
+          createdById,
+        },
+        include: ANTICIPO_LIST_INCLUDE,
+      });
+      await pasos.completar(tx, anticipo.id);
+      return anticipo;
     });
   }
 }

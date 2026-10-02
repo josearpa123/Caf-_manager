@@ -4,6 +4,20 @@
 
 **Última actualización:** 2026-10-01
 
+## Sprint 1 · PR 2 — idempotencia en pagos, anticipos y ventas (sesión 2026-10-01)
+
+Rama `feat/idempotencia-pagos-ventas`, apilada sobre `feat/idempotencia` (PR #4); retargetear a `main` cuando #4 se fusione.
+
+- **Cubre**: regla de dominio 6 completa para recepción, pago, anticipo y venta (H7).
+- **Código**: `ejecutarConLlave` en `apps/api/src/prisma/idempotencia.ts` encapsula búsqueda previa, 409, reserva y carrera; recepción pasó a usarlo (sin cambio de comportamiento) y se enganchó a `POST /pagos`, `POST /anticipos` y `POST /ventas` con el encabezado `Idempotency-Key` (alcances `PAGO`, `ANTICIPO`, `VENTA`; la llave es por alcance, la misma llave en otro alcance es otra operación).
+- **Cambio de comportamiento**: crear un pago o anticipo ahora ocurre dentro de `$transaction` (antes era un `create` suelto), necesario para reservar la llave en la misma transacción. Sin llave el resultado es el mismo.
+- **Pruebas**: unitarias del envoltorio (5), de pagos (4) y anticipos (4); integración con PostgreSQL real: 10 pagos simultáneos con la misma llave → uno solo, 409 con otro monto, alcance separado pago/anticipo, venta que no duplica el movimiento de salida. API: 119 unitarias y 23 de integración en verde.
+- **Conciliaciones** (`ConciliacionesService.create`) no se tocó: no mueve plata nueva, y ya tiene la carrera de sobre-aplicación anotada en el Sprint 0 PR 3; se resuelve junto con su transacción/bloqueo.
+
+### Pendiente / fuera de alcance
+- La web debe enviar `Idempotency-Key` en estas cuatro operaciones (pantalla de recepción rápida y formularios de pagos/ventas).
+- Contratos de venta, préstamos, abonos, secado y trilla no la aceptan aún (no son escrituras de plata directas o van en su propio PR).
+
 ## Sprint 1 · PR 1 — idempotencia en recepciones, cierra H7 en el backend (sesión 2026-10-01)
 
 Rama `feat/idempotencia` (sobre `main` de GitHub, PR #2 ya fusionado).
