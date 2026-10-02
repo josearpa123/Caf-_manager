@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { MetodoPago } from '@prisma/client';
 import { hashSolicitud } from '../../prisma/idempotencia';
