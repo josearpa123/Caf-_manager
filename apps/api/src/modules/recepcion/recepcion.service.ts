@@ -32,7 +32,7 @@ import { QueryRecepcionesDto } from './dto/query-recepciones.dto';
 // para producir una carga de 70 kg de almendra. Menor factor = mejor café.
 const KG_ALMENDRA_POR_CARGA = 70;
 
-const RECEPCION_DETAIL_INCLUDE = {
+export const RECEPCION_DETAIL_INCLUDE = {
   proveedor: {
     select: {
       id: true,
@@ -81,6 +81,7 @@ export class RecepcionService {
       proveedorId: query.proveedorId,
       puntoCompraId: query.puntoCompraId,
       tipoCafe: query.tipoCafe,
+      estado: query.estado,
     };
     if (query.desde || query.hasta) {
       where.fecha = {

@@ -49,6 +49,8 @@ export class FacturacionService {
     });
     if (!recepcion)
       throw new BadRequestException('La recepción indicada no existe en este tenant');
+    if (recepcion.estado === 'ANULADA')
+      throw new BadRequestException('La recepción está anulada: no se factura');
     if (recepcion.factura)
       throw new BadRequestException('Esta recepción ya tiene una factura asociada');
 

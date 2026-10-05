@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 
 const GRUPOS: Array<{ titulo: string; permisos: Permission[] }> = [
   { titulo: 'Proveedores', permisos: ['PROVEEDORES_VER', 'PROVEEDORES_CREAR', 'PROVEEDORES_EDITAR', 'PROVEEDORES_ELIMINAR'] },
-  { titulo: 'Recepción', permisos: ['RECEPCION_VER', 'RECEPCION_CREAR', 'RECEPCION_EDITAR', 'RECEPCION_ELIMINAR'] },
+  { titulo: 'Recepción', permisos: ['RECEPCION_VER', 'RECEPCION_CREAR', 'RECEPCION_EDITAR', 'RECEPCION_ELIMINAR', 'RECEPCION_ANULAR'] },
   { titulo: 'Calidad', permisos: ['CALIDAD_VER', 'CALIDAD_EDITAR'] },
   { titulo: 'Precios', permisos: ['PRECIOS_VER', 'PRECIOS_EDITAR'] },
   { titulo: 'Bodega', permisos: ['BODEGA_VER', 'BODEGA_SECADO_GESTIONAR', 'BODEGA_TRILLA_GESTIONAR', 'BODEGA_AJUSTES_GESTIONAR'] },

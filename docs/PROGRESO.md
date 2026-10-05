@@ -2,7 +2,28 @@
 
 > Este archivo se actualiza al final de cada sesión de trabajo relevante. Es lo primero que hay que leer al retomar el proyecto (junto con `docs/requerimientos.md` para decisiones de diseño ya tomadas).
 
-**Última actualización:** 2026-10-01
+**Última actualización:** 2026-10-03
+
+## Sprint 2 · PR 2 — anulación de recepciones, cierra H4 (sesión 2026-10-03)
+
+Rama `feat/anulacion-recepcion`. Decisiones del usuario: incluir RF-08 (bloquear si está en un secado, una trilla o una venta y decir cuál revertir primero) y revertir pagos y conciliaciones en la misma transacción y con idempotencia. Detalle en `docs/adr/010-anulacion-de-recepciones.md`.
+
+- **Cubre**: H4, RF-07, RF-08, CU-02 (menos la nota de ajuste DIAN), reglas 2, 4 y 6.
+- **Schema** (dos migraciones aditivas): `20261003000000_anulacion_recepcion_valores_enum` (permiso `RECEPCION_ANULAR` y origen de inventario `ANULACION_RECEPCION`, aparte porque PostgreSQL no deja usar un valor de enum en la misma transacción que lo crea) y `20261003000100_anulacion_recepcion` (`Recepcion.estado/anuladaAt/anuladaPorId/motivoAnulacion`, `Pago.anuladoAt/motivoAnulacion`, `ConciliacionAnticipo.anuladoAt`, índice `(tenantId, estado)` y el permiso para el rol Administrador de los negocios existentes). Sin deriva en `migrate diff`. El diccionario decía `fechaAnulacion`; el campo se llama `anuladaAt`, como el resto de marcas de tiempo.
+- **API**: `POST /recepcion/:id/anular` (permiso `RECEPCION_ANULAR`, encabezado `Idempotency-Key`, cuerpo `{ motivo }` de 10 a 500 caracteres). En una transacción: candado de fila, validaciones de RF-08, salida compensatoria de inventario, pagos y conciliaciones marcados, recepción `ANULADA`. Responde con la recepción y cuántos pagos y conciliaciones se anularon. `GET /recepcion?estado=` filtra por estado.
+- **RF-08**: 409 con el código del secado o la venta ("Revierte primero ese secado"). La trilla y la mezcla de pasilla no quedan ligadas a una recepción, así que se detectan por stock: si en bodega no queda lo que la recepción aportó, se bloquea.
+- **Lo que ignora las anuladas**: estado de cuenta del proveedor, saldo de anticipos, reportes (dashboard, saldos, CSV y Excel), y no admiten pagos, conciliaciones, secado, venta de lotes, decisión de destino de pasilla ni factura.
+- **Web**: botón "Anular" en el detalle de la recepción (solo con el permiso y si está activa) con diálogo de motivo y llave de idempotencia por motivo; aviso de anulada con fecha y motivo; insignia "Anulada" en el listado; `RECEPCION_ANULAR` en la pantalla de roles.
+- **Pruebas**: 17 unitarias del servicio y del DTO; 7 de integración con PostgreSQL real (anulación completa con pagos, anticipos, ledger y auditoría; no pagar ni anular dos veces; bloqueo por secado; bloqueo por stock; misma llave = una sola anulación y otra llave distinta con otro cuerpo = 409; **carrera de dos anulaciones simultáneas: una gana, la otra 409, una sola salida de inventario**; aislamiento entre negocios). API: 187 unitarias y 46 de integración; build de API y web limpios.
+
+### Pendiente / riesgos
+- **No hay cómo revertir un secado ni anular una venta**: el mensaje de bloqueo los nombra pero el usuario no tiene pantalla para deshacerlos. Hay que construirlo.
+- La nota de ajuste DIAN no se encola (no hay BullMQ hasta el Sprint 3); la respuesta trae `notaAjusteDianPendiente`.
+- Sin pruebas propias aún para las guardas de secado, ventas, conciliaciones y reportes que ignoran anuladas (la de pagos y estado de cuenta sí está en integración).
+- Ventana de carrera de la verificación por stock (ver ADR-010).
+- No probado a mano en el navegador: falta recorrer anular desde la pantalla con datos reales.
+- El manual de usuario (`apps/web/content/manual.md`, PR #12) debe decir cómo anular y dejar de decir que no existe; se actualiza cuando #12 llegue a `main`.
+- `estadoCuenta` y reportes siguen sumando plata con `number` (regla 1): deuda anterior, no de este PR.
 
 ## Café seco por calidad o a precio por kilo (sesión 2026-10-01, tras revisar el sistema en local)
 

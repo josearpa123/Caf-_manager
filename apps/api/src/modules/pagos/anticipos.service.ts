@@ -50,6 +50,7 @@ export class AnticiposService {
       include: {
         ...ANTICIPO_LIST_INCLUDE,
         conciliaciones: {
+          where: { anuladoAt: null },
           include: {
             recepcion: { select: { codigo: true } },
             pago: { select: { id: true, fecha: true, monto: true } },

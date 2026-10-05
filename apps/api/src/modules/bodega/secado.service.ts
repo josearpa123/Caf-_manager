@@ -81,6 +81,11 @@ export class SecadoService {
         'Una o más recepciones no existen en este tenant',
       );
     }
+    if (recepciones.some((r) => r.estado === 'ANULADA')) {
+      throw new BadRequestException(
+        'No se pueden secar recepciones anuladas',
+      );
+    }
     if (recepciones.some((r) => r.tipoCafe !== 'MOJADO')) {
       throw new BadRequestException(
         'Solo se pueden secar recepciones de tipo mojado',

@@ -47,7 +47,12 @@ export class ConciliacionesService {
 
     const anticipo = await this.prisma.anticipo.findUnique({
       where: { id: dto.anticipoId },
-      include: { conciliaciones: { select: { montoAplicado: true } } },
+      include: {
+        conciliaciones: {
+          where: { anuladoAt: null },
+          select: { montoAplicado: true },
+        },
+      },
     });
     if (!anticipo) throw new NotFoundException('Anticipo no encontrado');
     if (anticipo.proveedorId !== dto.proveedorId)
@@ -65,6 +70,10 @@ export class ConciliacionesService {
         throw new BadRequestException(
           'La recepción indicada no pertenece a este proveedor',
         );
+      if (recepcion.estado === 'ANULADA')
+        throw new BadRequestException(
+          `La recepción ${recepcion.codigo} está anulada: no admite conciliaciones`,
+        );
     }
 
     if (dto.pagoId) {
@@ -75,6 +84,10 @@ export class ConciliacionesService {
       if (pago.proveedorId !== dto.proveedorId)
         throw new BadRequestException(
           'El pago indicado no pertenece a este proveedor',
+        );
+      if (pago.anuladoAt)
+        throw new BadRequestException(
+          'El pago indicado está anulado: no admite conciliaciones',
         );
     }
 

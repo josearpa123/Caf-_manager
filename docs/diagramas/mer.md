@@ -27,6 +27,7 @@ erDiagram
   Proveedor ||--o{ Recepcion : "proveedor"
   TablaPrecioTramo |o--o{ Recepcion : "tablaPrecioTramo"
   User ||--o{ Recepcion : "createdBy"
+  User ||--o{ Recepcion : "anuladaPor"
   Tenant ||--o{ AnalisisCalidad : "tenant"
   Recepcion ||--o| AnalisisCalidad : "recepcion"
   User ||--o{ AnalisisCalidad : "createdBy"
@@ -193,6 +194,9 @@ erDiagram
     decimal valorRetencion
     decimal netoPagar
     EstadoRecepcion estado
+    datetime anuladaAt
+    string anuladaPorId FK
+    string motivoAnulacion
     string decididoPorId FK
     string createdById FK
   }
@@ -257,6 +261,7 @@ erDiagram
     string recepcionId FK
     decimal monto
     datetime fecha
+    datetime anuladoAt
     string createdById FK
   }
   ConciliacionAnticipo {
@@ -267,6 +272,7 @@ erDiagram
     string recepcionId FK
     string pagoId FK
     datetime fecha
+    datetime anuladoAt
     string createdById FK
   }
   Prestamo {

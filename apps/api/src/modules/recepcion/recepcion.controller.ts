@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { Modulo, Permission } from '@prisma/client';
 import { RecepcionService } from './recepcion.service';
+import { AnulacionRecepcionService } from './anulacion-recepcion.service';
+import { AnularRecepcionDto } from './dto/anular-recepcion.dto';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { RequireModulo } from '../../common/decorators/require-modulo.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -20,7 +22,10 @@ import { QueryRetencionDto } from './dto/query-retencion.dto';
 @Controller('recepcion')
 @RequireModulo(Modulo.RECEPCION)
 export class RecepcionController {
-  constructor(private readonly recepcionService: RecepcionService) {}
+  constructor(
+    private readonly recepcionService: RecepcionService,
+    private readonly anulacionService: AnulacionRecepcionService,
+  ) {}
 
   @RequirePermissions(Permission.RECEPCION_VER)
   @Get()
@@ -64,6 +69,26 @@ export class RecepcionController {
     return this.recepcionService.create(
       tenantId,
       userId,
+      dto,
+      validarLlave(idempotencyKey),
+    );
+  }
+
+  // CU-02: anular = marcar ANULADA con motivo + salida compensatoria de inventario
+  // + reversión de pagos y conciliaciones, todo en una transacción.
+  @RequirePermissions(Permission.RECEPCION_ANULAR)
+  @Post(':id/anular')
+  anular(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: AnularRecepcionDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.anulacionService.anular(
+      tenantId,
+      userId,
+      id,
       dto,
       validarLlave(idempotencyKey),
     );
