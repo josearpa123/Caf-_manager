@@ -212,6 +212,8 @@ El administrador puede hacer todo lo del operador. "Registrar recepción rápida
 | `IdempotencyKey` | `hashSolicitud`, `recursoId`, `expiraEn` | `String`, `String?`, `DateTime` | Se reserva como primera sentencia de la transacción de negocio y se completa con el id creado; vigencia de 24 h; misma llave con otro cuerpo → 409 | 1 |
 | `Recepcion` (hecho) | `numeroSacos` | `Int?` | Tara = sacos × `ConfiguracionTenant.taraPorSacoKg`; si se digita `pesoTara` manda esa. La tara queda copiada en la recepción | 1 |
 | `Proveedor` (hecho) | `apodo` | `String?` | Buscable; índice de trigramas (`pg_trgm`) sobre nombre, apodo y cédula | 1 |
+| `ConfiguracionTenant` (hecho) | `modoCompraPergamino` | enum `CALIDAD`, `PRECIO_DIRECTO` | Forma habitual de comprar café seco; por compra se puede cambiar. Con `PRECIO_DIRECTO` el pergamino no lleva análisis ni tramo | 2 |
+| `ConfiguracionTenant` (hecho) | `modulosOcultos` | `Modulo[]` | Módulos que el negocio no quiere ver en el menú; solo visual, no cambia permisos ni plan | 2 |
 | `ConfiguracionTenant` | `taraPorSacoKg` (hecho, Sprint 1), `esAgenteRetencion` (hecho, Sprint 2: opcional, lo activa el comprador; ADR-009) | `Decimal`, `Boolean` | Valores por defecto de la recepción rápida y la retención | 1–2 |
 | `Recepcion` (hecho) | `estado` | enum `ACTIVA`, `ANULADA` | Por defecto `ACTIVA`; los reportes, el estado de cuenta, el secado y las ventas ignoran las `ANULADA` | 2 |
 | `Recepcion` (hecho) | `anuladaPorId`, `anuladaAt`, `motivoAnulacion` | `String?`, `DateTime?`, `String?` | Se llenan al anular (motivo de 10 a 500 caracteres); null mientras esté `ACTIVA` | 2 |

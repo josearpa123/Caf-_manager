@@ -421,12 +421,20 @@ export default function RecepcionRapidaPage() {
       <PageHeader
         title="Recepción rápida"
         actions={
+          <div className="flex items-center gap-2">
+            <Link
+              href="/ayuda#comprar-cafe-recepcion"
+              className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+            >
+              ¿Cómo se usa?
+            </Link>
           <Link
             href="/recepcion/nueva"
             className={buttonVariants({ variant: 'outline', size: 'sm' })}
           >
             Formulario completo
           </Link>
+          </div>
         }
       />
 

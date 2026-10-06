@@ -111,6 +111,7 @@ Monorepo con **pnpm workspaces** + **Turborepo**.
 
 | Diagrama | Archivo |
 | --- | --- |
+| Manual de usuario (también en el sistema: Administración → Ayuda) | [`apps/web/content/manual.md`](apps/web/content/manual.md) |
 | Modelo entidad-relación completo | [`docs/diagramas/mer.md`](docs/diagramas/mer.md) |
 | Secuencia de la recepción rápida | [`docs/diagramas/secuencia-recepcion.md`](docs/diagramas/secuencia-recepcion.md) |
 
