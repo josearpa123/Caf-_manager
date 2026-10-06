@@ -23,3 +23,20 @@ export function isoDiaColombia(instante: Date = new Date()): string {
 export function anioColombia(instante: Date = new Date()): number {
   return diaColombia(instante).getUTCFullYear();
 }
+
+// Instante desplazado a hora de Colombia: sus getters UTC devuelven año, mes,
+// día y semana tal como se vieron en Bogotá. Solo para agrupar, no para guardar.
+export function enHoraColombia(instante: Date): Date {
+  return new Date(instante.getTime() + DESFASE_COLOMBIA_MS);
+}
+
+// Rango [00:00:00.000, 23:59:59.999] hora Colombia de los días 'AAAA-MM-DD'
+// (o ISO completo: solo cuenta la parte de la fecha). Una compra de las 8 p. m.
+// cae en su día, no en el siguiente.
+export function inicioDiaColombia(dia: string): Date {
+  return new Date(`${dia.slice(0, 10)}T05:00:00.000Z`);
+}
+
+export function finDiaColombia(dia: string): Date {
+  return new Date(inicioDiaColombia(dia).getTime() + 24 * 3600 * 1000 - 1);
+}

@@ -1,4 +1,11 @@
-import { anioColombia, diaColombia, isoDiaColombia } from './fecha-colombia';
+import {
+  anioColombia,
+  diaColombia,
+  enHoraColombia,
+  finDiaColombia,
+  inicioDiaColombia,
+  isoDiaColombia,
+} from './fecha-colombia';
 
 describe('fecha-colombia (America/Bogota, UTC-5)', () => {
   it.each([
@@ -22,5 +29,35 @@ describe('fecha-colombia (America/Bogota, UTC-5)', () => {
     expect(anioColombia(new Date('2026-12-31T23:59:59Z'))).toBe(2026);
     expect(anioColombia(new Date('2027-01-01T04:59:59Z'))).toBe(2026);
     expect(anioColombia(new Date('2027-01-01T05:00:00Z'))).toBe(2027);
+  });
+});
+
+describe('rango de días de Colombia', () => {
+  it('el día empieza a las 5 a. m. UTC y termina 24 h menos 1 ms después', () => {
+    expect(inicioDiaColombia('2026-10-01').toISOString()).toBe(
+      '2026-10-01T05:00:00.000Z',
+    );
+    expect(finDiaColombia('2026-10-01').toISOString()).toBe(
+      '2026-10-02T04:59:59.999Z',
+    );
+  });
+
+  it('acepta un ISO completo y usa solo la fecha', () => {
+    expect(inicioDiaColombia('2026-10-01T00:00:00.000Z').toISOString()).toBe(
+      '2026-10-01T05:00:00.000Z',
+    );
+  });
+
+  it('una compra de las 8 p. m. queda dentro de su día', () => {
+    const compra = new Date('2026-10-02T01:00:00Z'); // 8 p. m. del 1 de octubre en Bogotá
+    expect(compra >= inicioDiaColombia('2026-10-01')).toBe(true);
+    expect(compra <= finDiaColombia('2026-10-01')).toBe(true);
+    expect(compra > finDiaColombia('2026-09-30')).toBe(true);
+  });
+
+  it('enHoraColombia desplaza para agrupar', () => {
+    expect(enHoraColombia(new Date('2026-10-02T01:00:00Z')).getUTCDate()).toBe(
+      1,
+    );
   });
 });
