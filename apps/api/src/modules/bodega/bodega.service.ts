@@ -83,6 +83,9 @@ export class BodegaService {
       where: { id: recepcionId },
     });
     if (!recepcion) throw new NotFoundException('Recepción no encontrada');
+    if (recepcion.estado === 'ANULADA') {
+      throw new BadRequestException('La recepción está anulada');
+    }
     if (recepcion.tipoCafe !== 'PASILLA') {
       throw new BadRequestException('Solo aplica a recepciones de pasilla');
     }

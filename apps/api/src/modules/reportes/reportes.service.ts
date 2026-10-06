@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { MetodoPago, Prisma, TipoCafeRecepcion } from '@prisma/client';
+import {
+  EstadoRecepcion,
+  MetodoPago,
+  Prisma,
+  TipoCafeRecepcion,
+} from '@prisma/client';
 import ExcelJS from 'exceljs';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
@@ -92,15 +97,17 @@ export class ReportesService {
     const [compras, pagos, conciliaciones, proveedores] = await Promise.all([
       this.prisma.recepcion.groupBy({
         by: ['proveedorId'],
+        where: { estado: EstadoRecepcion.ACTIVA },
         _sum: { valorTotal: true },
       }),
       this.prisma.pago.groupBy({
         by: ['proveedorId'],
-        where: { metodoPago: { not: MetodoPago.CREDITO } },
+        where: { metodoPago: { not: MetodoPago.CREDITO }, anuladoAt: null },
         _sum: { monto: true },
       }),
       this.prisma.conciliacionAnticipo.groupBy({
         by: ['proveedorId'],
+        where: { anuladoAt: null },
         _sum: { montoAplicado: true },
       }),
       this.prisma.proveedor.findMany({ select: { id: true, nombre: true } }),
@@ -141,7 +148,7 @@ export class ReportesService {
       await Promise.all([
         this.prisma.recepcion.groupBy({
           by: ['tipoCafe'],
-          where: { puntoCompraId, fecha },
+          where: { puntoCompraId, fecha, estado: EstadoRecepcion.ACTIVA },
           _sum: { pesoNeto: true, valorTotal: true },
           _count: true,
         }),
@@ -150,6 +157,7 @@ export class ReportesService {
             recepcion: {
               puntoCompraId,
               fecha,
+              estado: EstadoRecepcion.ACTIVA,
               tipoCafe: TipoCafeRecepcion.PERGAMINO,
             },
           },
@@ -326,6 +334,7 @@ export class ReportesService {
       where: {
         puntoCompraId: query.puntoCompraId,
         fecha: buildFechaWhere(query.desde, query.hasta),
+        estado: EstadoRecepcion.ACTIVA,
       },
       include: {
         proveedor: { select: { nombre: true } },
@@ -368,6 +377,7 @@ export class ReportesService {
         where: {
           puntoCompraId: query.puntoCompraId,
           fecha: buildFechaWhere(query.desde, query.hasta),
+          estado: EstadoRecepcion.ACTIVA,
         },
         include: {
           proveedor: { select: { nombre: true } },

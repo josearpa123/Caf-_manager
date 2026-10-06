@@ -86,6 +86,7 @@ export const Permission = {
   RECEPCION_CREAR: 'RECEPCION_CREAR',
   RECEPCION_EDITAR: 'RECEPCION_EDITAR',
   RECEPCION_ELIMINAR: 'RECEPCION_ELIMINAR',
+  RECEPCION_ANULAR: 'RECEPCION_ANULAR',
 
   CALIDAD_VER: 'CALIDAD_VER',
   CALIDAD_EDITAR: 'CALIDAD_EDITAR',
@@ -287,6 +288,11 @@ export interface Recepcion {
   precioKg: string;
   valorTotal: string;
   destinoPasilla: DestinoPasilla | null;
+  // Anulación (CU-02): una recepción no se borra, se anula con motivo.
+  estado: 'ACTIVA' | 'ANULADA';
+  anuladaAt: string | null;
+  anuladaPorId: string | null;
+  motivoAnulacion: string | null;
   createdById: string;
   createdAt: string;
   updatedAt: string;

@@ -77,11 +77,16 @@ export default function RecepcionPage() {
             <TableEmpty colSpan={7}>No hay recepciones registradas.</TableEmpty>
           )}
           {recepciones.map((r) => (
-            <TableRow key={r.id}>
+            <TableRow key={r.id} className={r.estado === 'ANULADA' ? 'opacity-60' : undefined}>
               <TableCell>
                 <Link href={`/recepcion/${r.id}`} className="font-medium hover:underline">
                   {r.codigo}
                 </Link>
+                {r.estado === 'ANULADA' && (
+                  <Badge variant="destructive" className="ml-2">
+                    Anulada
+                  </Badge>
+                )}
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {new Date(r.fecha).toLocaleDateString('es-CO')}

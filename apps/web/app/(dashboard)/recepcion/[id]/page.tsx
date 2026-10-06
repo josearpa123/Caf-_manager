@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import type { Recepcion } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { AnularRecepcionDialog } from '@/components/recepcion/anular-recepcion-dialog';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -28,6 +32,8 @@ export default function RecepcionDetallePage() {
   const params = useParams<{ id: string }>();
   const [recepcion, setRecepcion] = useState<Recepcion | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [anulando, setAnulando] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     api
@@ -42,12 +48,43 @@ export default function RecepcionDetallePage() {
   if (!recepcion) return <div className="p-8 text-sm text-muted-foreground">Cargando…</div>;
 
   const analisis = recepcion.analisisCalidad;
+  const anulada = recepcion.estado === 'ANULADA';
+  const puedeAnular = !anulada && !!user?.permissions.includes('RECEPCION_ANULAR');
 
   return (
     <div className="p-8">
       <PageHeader
         title={recepcion.codigo}
         description={new Date(recepcion.fecha).toLocaleString('es-CO')}
+        actions={
+          <div className="flex items-center gap-2">
+            {anulada && <Badge variant="destructive">Anulada</Badge>}
+            {puedeAnular && (
+              <Button variant="destructive" onClick={() => setAnulando(true)}>
+                Anular
+              </Button>
+            )}
+          </div>
+        }
+      />
+
+      {anulada && (
+        <div className="mt-6 max-w-2xl rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm">
+          <p className="font-medium text-destructive">Esta recepción está anulada</p>
+          <p className="mt-1 text-muted-foreground">
+            {recepcion.anuladaAt
+              ? `${new Date(recepcion.anuladaAt).toLocaleString('es-CO')}. `
+              : ''}
+            Motivo: {recepcion.motivoAnulacion}
+          </p>
+        </div>
+      )}
+
+      <AnularRecepcionDialog
+        recepcion={recepcion}
+        open={anulando}
+        onOpenChange={setAnulando}
+        onAnulada={setRecepcion}
       />
 
       <Card className="mt-6 max-w-2xl">

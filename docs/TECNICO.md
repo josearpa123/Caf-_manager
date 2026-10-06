@@ -39,7 +39,7 @@ Los diagramas de este documento son la versión para leer. El anexo trae los mis
 | H1 ✅ | El código de recepción (`REC-2026-000123`) se genera con `count()` + 1 | `recepcion.service.ts` | Dos recepciones simultáneas en el mismo tenant obtienen el mismo código y una falla con error 500. Además `count()` se vuelve más lento a medida que crece la tabla | Tabla de consecutivos por tenant y tipo con `UPDATE … RETURNING` atómico (sprint 0) |
 | H2 ✅ | Solo existe la prueba e2e de ejemplo; no hay pruebas de los cálculos | `apps/api/test` | Un cambio en el factor o el precio puede romper la plata de los clientes sin que nadie lo note | Pruebas unitarias del dominio con meta de cobertura (sprint 0) |
 | H3 ✅ | El formulario de recepción pide 9+ campos sin valores por defecto | `recepcion/nueva/page.tsx` | No se cumple la meta de 45 segundos; el usuario vuelve al cuaderno | Recepción rápida (sprint 1; pantalla hecha, falta la medición de 45 s) |
-| H4 | No hay anulación de recepciones ni campo de estado | modelo `Recepcion` | Los errores de digitación se quedan para siempre o se borran sin rastro | Estado + anulación con movimiento compensatorio (sprint 2) |
+| H4 ✅ | No hay anulación de recepciones ni campo de estado | modelo `Recepcion` | Los errores de digitación se quedan para siempre o se borran sin rastro | Estado + anulación con movimiento compensatorio (sprint 2; hecho en el backend y en el detalle de la web, ADR-010) |
 | H5 ✅ | No hay cálculo de retención en la fuente | dominio de recepción y pagos | Incumplimiento tributario del cliente; argumento de venta perdido | Parámetros tributarios con vigencia (sprint 2) |
 | H6 | No hay cola de trabajos; Redis está en el compose pero la API no lo usa | infraestructura | Generar PDFs, enviar WhatsApp o llamar a la DIAN dentro de la petición la vuelve lenta y frágil | BullMQ sobre Redis (sprint 3) |
 | H7 ✅ | No hay protección contra reintentos (idempotencia) | `POST /recepciones` | Con mala señal, el usuario oprime dos veces y se crean dos recepciones | Llave de idempotencia por petición (sprint 1; backend de recepción hecho, ver ADR-007; backend de pagos, anticipos y ventas hecho; falta enviarla desde la web) |
@@ -63,7 +63,7 @@ Los diagramas de este documento son la versión para leer. El anexo trae los mis
 | --- | --- | --- |
 | 0 · Bases | En curso | PR 1 hecho (pruebas de dominio de recepción, H2 parcial). PR 2 hecho: consecutivos atómicos en los 7 servicios (**H1 cerrado**). PR 3 hecho: pruebas de `pagos` (**H2 cerrado** en lo funcional; cobertura 100% de líneas en `recepcion` y `pagos`). PR 4 hecho: CI con umbral de cobertura (90% líneas en servicios de `recepcion` y `pagos`), verificación schema↔migraciones y pruebas de integración. Pendiente: Sentry (requiere aprobar dependencias) y activar la protección de la rama `main` en GitHub |
 | 1 · Recepción rápida | En curso | PR 1 y 2 hechos: idempotencia en `POST /recepcion`, `/pagos`, `/anticipos` y `/ventas` con tabla genérica `IdempotencyKey` (ADR-007, **H7 cerrado en el backend**). PR 3 hecho: búsqueda de proveedor `GET /proveedores/buscar` con `pg_trgm`, `unaccent` y `apodo` (RF-02, ADR-008). PR 4 hecho: backend de recepción rápida (tara por sacos, `GET /tabla-precios/precio`). PR 5 hecho: pantalla `/recepcion/rapida` (**H3 cerrado en código**; falta medir los 45 s con cronómetro en celular), menú responsive y peso del saco en Configuración. Pendiente: medir con cronómetro 10 recepciones seguidas en celular (criterio de cierre del sprint); `ParametroTributario`/retención y recibo son del Sprint 2 |
-| 2 · Recibo, anulación y retención | En curso | PR 1 hecho: zona horaria fija America/Bogota y retención en la fuente opcional por negocio con `ParametroTributario` sembrada y verificada (**H5 cerrado**, ADR-009). Pendiente: anulación (RF-07/08), pago en el mismo paso (RF-10), recibo térmico y para compartir (RF-06) |
+| 2 · Recibo, anulación y retención | En curso | PR 1 hecho: zona horaria fija America/Bogota y retención en la fuente opcional por negocio con `ParametroTributario` sembrada y verificada (**H5 cerrado**, ADR-009). PR 2 hecho: anulación de recepciones (RF-07/08, CU-02, **H4 cerrado**, ADR-010): estado `ANULADA` con motivo, quién y cuándo; salida compensatoria de inventario; reversión de pagos y conciliaciones; bloqueo si está en un secado o una venta o si el café ya salió de bodega; con idempotencia. Pendiente: pago en el mismo paso (RF-10), recibo térmico y para compartir (RF-06); revertir un secado o una venta aún no existe en el sistema; la nota de ajuste DIAN espera a BullMQ |
 | 3–4 | Pendiente | — |
 
 **Fase 2 (enero–marzo de 2027), solo si pasa el punto de decisión del 5 de enero:** documento soporte electrónico con un proveedor tecnológico (H8), modo sin conexión (PWA con cola local), cobro de la suscripción y suspensión por mora dentro de la plataforma.
@@ -213,8 +213,9 @@ El administrador puede hacer todo lo del operador. "Registrar recepción rápida
 | `Recepcion` (hecho) | `numeroSacos` | `Int?` | Tara = sacos × `ConfiguracionTenant.taraPorSacoKg`; si se digita `pesoTara` manda esa. La tara queda copiada en la recepción | 1 |
 | `Proveedor` (hecho) | `apodo` | `String?` | Buscable; índice de trigramas (`pg_trgm`) sobre nombre, apodo y cédula | 1 |
 | `ConfiguracionTenant` | `taraPorSacoKg` (hecho, Sprint 1), `esAgenteRetencion` (hecho, Sprint 2: opcional, lo activa el comprador; ADR-009) | `Decimal`, `Boolean` | Valores por defecto de la recepción rápida y la retención | 1–2 |
-| `Recepcion` | `estado` | enum `ACTIVA`, `ANULADA` | Por defecto `ACTIVA`; los reportes filtran `ACTIVA` | 2 |
-| `Recepcion` | `anuladaPorId`, `fechaAnulacion`, `motivoAnulacion` | `String?`, `DateTime?`, `String?` | Obligatorios cuando `estado = ANULADA` | 2 |
+| `Recepcion` (hecho) | `estado` | enum `ACTIVA`, `ANULADA` | Por defecto `ACTIVA`; los reportes, el estado de cuenta, el secado y las ventas ignoran las `ANULADA` | 2 |
+| `Recepcion` (hecho) | `anuladaPorId`, `anuladaAt`, `motivoAnulacion` | `String?`, `DateTime?`, `String?` | Se llenan al anular (motivo de 10 a 500 caracteres); null mientras esté `ACTIVA` | 2 |
+| `Pago` y `ConciliacionAnticipo` (hecho) | `anuladoAt` (y `motivoAnulacion` en `Pago`) | `DateTime?`, `String?` | Se marcan al anular la recepción; no se borran. El saldo y los reportes cuentan solo las filas con `anuladoAt` null | 2 |
 | `Recepcion` (hecho) | `baseRetencion`, `tarifaRetencion`, `valorRetencion`, `netoPagar` | `Decimal` | Copiados e inmutables al guardar, igual que `precioKg` | 2 |
 | `ParametroTributario` (nueva, hecha) | `concepto`, `vigenteDesde`, `valorUvt`, `umbralUvt`, `tarifa` | enum, `Date`, `Decimal` × 3 | Global de plataforma; se usa la fila vigente en la fecha de la recepción | 2 |
 | `Factura` → `DocumentoElectronico` | `tipo` | enum `DOCUMENTO_SOPORTE`, `NOTA_AJUSTE` | Renombrar con migración en dos pasos | Fase 2 |
@@ -245,6 +246,8 @@ El administrador puede hacer todo lo del operador. "Registrar recepción rápida
 6. ADR-006 · Hostinger KVM 2 con Coolify como plataforma de despliegue.
 7. ADR-007 · Idempotencia con tabla genérica de llaves reservada dentro de la transacción.
 8. ADR-008 · Búsqueda de proveedor con trigramas (`pg_trgm`) en un endpoint propio.
+9. ADR-009 · Zona horaria fija de Colombia y retención en la fuente opcional.
+10. ADR-010 · Anulación de recepciones: qué se revierte, qué la bloquea y cómo se marca.
 
 ## Escalabilidad sin cuellos de botella
 

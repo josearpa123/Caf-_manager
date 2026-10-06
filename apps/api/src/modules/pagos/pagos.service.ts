@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MetodoPago, Prisma } from '@prisma/client';
+import { EstadoRecepcion, MetodoPago, Prisma } from '@prisma/client';
 import {
   ejecutarConLlave,
   type PasosIdempotencia,
@@ -125,6 +125,10 @@ export class PagosService {
         throw new BadRequestException(
           'La recepción indicada no pertenece a este proveedor',
         );
+      if (recepcion.estado === EstadoRecepcion.ANULADA)
+        throw new BadRequestException(
+          `La recepción ${recepcion.codigo} está anulada: no admite pagos`,
+        );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -162,11 +166,11 @@ export class PagosService {
     const [recepciones, pagos, anticipos, conciliaciones, prestamosVigentes] =
       await Promise.all([
         this.prisma.recepcion.findMany({
-          where: { proveedorId },
+          where: { proveedorId, estado: EstadoRecepcion.ACTIVA },
           select: { valorTotal: true },
         }),
         this.prisma.pago.findMany({
-          where: { proveedorId },
+          where: { proveedorId, anuladoAt: null },
           select: { monto: true, metodoPago: true },
         }),
         this.prisma.anticipo.findMany({
@@ -174,7 +178,7 @@ export class PagosService {
           select: { monto: true },
         }),
         this.prisma.conciliacionAnticipo.findMany({
-          where: { proveedorId },
+          where: { proveedorId, anuladoAt: null },
           select: { montoAplicado: true },
         }),
         // Solo préstamos VIGENTES tienen saldo por cobrar: los PAGADOS ya

@@ -177,8 +177,13 @@ export class VentasService {
 
     const recepciones = await this.prisma.recepcion.findMany({
       where: { id: { in: dto.lotesOrigen.map((l) => l.recepcionId) } },
-      select: { id: true },
+      select: { id: true, estado: true },
     });
+    if (recepciones.some((r) => r.estado === 'ANULADA')) {
+      throw new BadRequestException(
+        'No se pueden usar recepciones anuladas como lote de origen',
+      );
+    }
     if (
       recepciones.length !==
       new Set(dto.lotesOrigen.map((l) => l.recepcionId)).size

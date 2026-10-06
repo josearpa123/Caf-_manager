@@ -1,5 +1,5 @@
 import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
-import { TipoCafeRecepcion } from '@prisma/client';
+import { EstadoRecepcion, TipoCafeRecepcion } from '@prisma/client';
 
 export class QueryRecepcionesDto {
   @IsOptional()
@@ -13,6 +13,10 @@ export class QueryRecepcionesDto {
   @IsOptional()
   @IsEnum(TipoCafeRecepcion)
   tipoCafe?: TipoCafeRecepcion;
+
+  @IsOptional()
+  @IsEnum(EstadoRecepcion)
+  estado?: EstadoRecepcion;
 
   @IsOptional()
   @IsDateString()

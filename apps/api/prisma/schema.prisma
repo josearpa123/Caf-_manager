@@ -48,6 +48,7 @@ enum Permission {
   RECEPCION_CREAR
   RECEPCION_EDITAR
   RECEPCION_ELIMINAR
+  RECEPCION_ANULAR
 
   CALIDAD_VER
   CALIDAD_EDITAR
@@ -165,6 +166,7 @@ enum OrigenMovimientoInventario {
   MEZCLA_PASILLA
   VENTA
   AJUSTE_MANUAL
+  ANULACION_RECEPCION
 }
 
 enum MetodoPago {
@@ -362,6 +364,7 @@ model User {
   refreshTokens         RefreshToken[]
   proveedoresCreados    Proveedor[]            @relation("ProveedorCreadoPor")
   recepcionesCreadas    Recepcion[]            @relation("RecepcionCreadaPor")
+  recepcionesAnuladas   Recepcion[]            @relation("RecepcionAnuladaPor")
   analisisCreados       AnalisisCalidad[]      @relation("AnalisisCreadoPor")
   tablasPrecioCreadas   TablaPrecioTramo[]     @relation("TablaPrecioCreadaPor")
   procesosSecadoCreados ProcesoSecado[]        @relation("ProcesoSecadoCreadoPor")
@@ -549,6 +552,12 @@ model DefectoTipo {
 // RECEPCIÓN Y CALIDAD (Recepción = Lote)
 // ============================================================
 
+// Una recepción no se borra ni se edita en su plata: se anula (CU-02, ADR-010).
+enum EstadoRecepcion {
+  ACTIVA
+  ANULADA
+}
+
 model Recepcion {
   id            String            @id @default(cuid())
   tenantId      String
@@ -580,6 +589,12 @@ model Recepcion {
   fechaDecisionDestino DateTime?
   decididoPorId        String?
 
+  // Anulación (CU-02): quién, cuándo y por qué. Mientras sea ACTIVA los tres son null.
+  estado          EstadoRecepcion @default(ACTIVA)
+  anuladaAt       DateTime?
+  anuladaPorId    String?
+  motivoAnulacion String?
+
   createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -589,6 +604,7 @@ model Recepcion {
   proveedor        Proveedor         @relation(fields: [proveedorId], references: [id])
   tablaPrecioTramo TablaPrecioTramo? @relation(fields: [tablaPrecioTramoId], references: [id])
   createdBy        User              @relation("RecepcionCreadaPor", fields: [createdById], references: [id])
+  anuladaPor       User?             @relation("RecepcionAnuladaPor", fields: [anuladaPorId], references: [id])
 
   analisisCalidad       AnalisisCalidad? // null para PASILLA
   factura               Factura?
@@ -603,6 +619,7 @@ model Recepcion {
   @@index([tenantId, proveedorId])
   @@index([tenantId, puntoCompraId])
   @@index([tenantId, tipoCafe])
+  @@index([tenantId, estado])
 }
 
 // Solo existe para recepciones de tipoCafe = MOJADO (pasilla no se analiza).
@@ -793,19 +810,22 @@ model Anticipo {
 // metodoPago = CREDITO significa que esta compra/pago queda como deuda
 // pendiente (no hubo movimiento de caja real) hasta un pago posterior.
 model Pago {
-  id            String     @id @default(cuid())
-  tenantId      String
-  proveedorId   String
-  puntoCompraId String
-  recepcionId   String? // atajo: pago directo de una compra puntual
-  monto         Decimal    @db.Decimal(14, 2)
-  fecha         DateTime   @default(now())
-  metodoPago    MetodoPago
-  referencia    String?
-  numeroCheque  String?
-  notas         String?
-  createdById   String
-  createdAt     DateTime   @default(now())
+  id              String     @id @default(cuid())
+  tenantId        String
+  proveedorId     String
+  puntoCompraId   String
+  recepcionId     String? // atajo: pago directo de una compra puntual
+  monto           Decimal    @db.Decimal(14, 2)
+  fecha           DateTime   @default(now())
+  metodoPago      MetodoPago
+  referencia      String?
+  numeroCheque    String?
+  notas           String?
+  // Se llena al anular la recepción asociada; el pago no se borra (regla 2).
+  anuladoAt       DateTime?
+  motivoAnulacion String?
+  createdById     String
+  createdAt       DateTime   @default(now())
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
   proveedor   Proveedor   @relation(fields: [proveedorId], references: [id])
@@ -823,17 +843,19 @@ model Pago {
 // Conciliación MANUAL: registra cómo un anticipo se aplicó posteriormente
 // contra una recepción y/o un pago formal.
 model ConciliacionAnticipo {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   tenantId      String
   proveedorId   String
   anticipoId    String
   recepcionId   String?
   pagoId        String?
-  montoAplicado Decimal  @db.Decimal(14, 2)
-  fecha         DateTime @default(now())
+  montoAplicado Decimal   @db.Decimal(14, 2)
+  fecha         DateTime  @default(now())
   notas         String?
+  // Se llena al anular la recepción asociada; el anticipo vuelve a quedar sin aplicar.
+  anuladoAt     DateTime?
   createdById   String
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
 
   tenant    Tenant     @relation(fields: [tenantId], references: [id])
   proveedor Proveedor  @relation(fields: [proveedorId], references: [id])
