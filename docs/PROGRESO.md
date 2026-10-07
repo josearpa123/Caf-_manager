@@ -4,6 +4,23 @@
 
 **Última actualización:** 2026-10-03
 
+## Sprint 2 · PR 4 — pago en el mismo paso de la compra, RF-10 (sesión 2026-10-06)
+
+Rama `feat/pago-en-recepcion`, apilada sobre `feat/idempotencia-web-pagos` (PR #16). Decisión: el pago cubre **todo** el neto a pagar (anticipos primero, el resto con el método elegido); los pagos parciales siguen en Pagos. Métodos: efectivo, transferencia o cheque (el crédito es "dejar por pagar").
+
+- **Cubre**: RF-10, CU-01 pasos 6 y 8, reglas 1, 4 y 6.
+- **API**: `POST /recepcion` acepta `pago: { metodoPago, numeroCheque?, referencia?, anticipos?: [{ anticipoId, montoAplicado }] }`. En la misma transacción de la recepción: candado de fila por anticipo (en orden fijo, para que dos compras simultáneas no consuman el mismo saldo), validación de proveedor y saldo, un `Pago` ligado a la recepción por el saldo restante y una `ConciliacionAnticipo` por anticipo. Si los anticipos cubren todo, no se crea `Pago`. Cálculo en `pago-en-recepcion.ts` (`liquidarPago`, todo en Decimal) y se valida antes de gastar un consecutivo. Nuevo `GET /anticipos/disponibles?proveedorId=` (anticipos con saldo, en texto decimal). Sin cambios de schema ni migración.
+- **Web**: sección "¿Pagas ahora?" en la recepción rápida (`components/recepcion/pago-en-recepcion.tsx`): anticipos del proveedor con "usar", método, número de cheque y el resumen "anticipos aplicados / se paga ahora"; la confirmación dice si el pago quedó registrado.
+- **Anulación**: no cambió; ya revierte pagos y conciliaciones por `recepcionId`, y una prueba lo confirma para el pago del mismo paso.
+- **Pruebas**: 7 unitarias de `liquidarPago`, 1 de `disponibles`; 9 de integración con PostgreSQL real (sin pago; efectivo; mixto; solo anticipos; atomicidad si falla el anticipo; anticipo de otro proveedor; saldo ya usado; **carrera de dos recepciones con el mismo anticipo: una gana**; misma llave = una sola recepción y un solo pago; anular revierte todo). API: 200 unitarias y 56 de integración; lint, build de API y de web en verde.
+- **Cómo probarlo a mano**: crear un anticipo de $100.000 a un proveedor; en Recepción rápida comprar a ese proveedor, "Pagar ahora", usar el anticipo y pagar el resto en efectivo; revisar en Pagos el pago y en el anticipo la conciliación; anular la recepción y ver el saldo del anticipo recuperado.
+
+### Pendiente / riesgos
+- No probado a mano en el navegador.
+- Quien registra compras sin permiso de ver anticipos no ve la lista de anticipos (la pantalla paga sin descontarlos); decidir si `RECEPCION_CREAR` debería poder verlos.
+- El manual (`manual.md`) se actualizó aquí; la frase sobre el pago del mismo paso al anular quedó pendiente porque el texto de anulación vive en el PR #15 (sin fusionar).
+- `POST /conciliaciones` sigue sin llave de idempotencia. `monto` en DTOs de pagos y anticipos sigue como `number` (regla 1, deuda anterior).
+
 ## Sprint 2 · PR 4 — la web envía la llave de idempotencia en pagos, anticipos y ventas (sesión 2026-10-06)
 
 Rama `feat/idempotencia-web-pagos`. Cierra el pendiente de H7 / ADR-007: el backend ya aceptaba la llave, pero la web solo la mandaba en recepción y anulación.

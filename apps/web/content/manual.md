@@ -37,7 +37,8 @@ Entra a **Recepción** y oprime **Nueva recepción**. Es una sola pantalla. Con 
    - **Pasilla:** café de baja calidad. Se paga a un precio por kilo que acuerdas.
 4. **Peso bruto y sacos.** Escribe lo que marca la báscula y cuántos sacos son. El sistema calcula la **tara** (sacos × peso del saco) y el **peso neto**. Si necesitas, toca "editar" y escribe la tara tú.
 5. **Precio.** Depende del tipo de café (ver abajo).
-6. **Guardar.** Verás el código de la recepción (por ejemplo REC-2026-000024), el neto y el total. **Nueva recepción** te deja listo para el siguiente caficultor.
+6. **¿Pagas ahora?** Puedes dejar la compra **por pagar** (se paga después en Pagos) o pagarla en este mismo paso con **Pagar ahora**. Si ese proveedor tiene anticipos con saldo, aparecen en la lista: escribe cuánto aplicar de cada uno, o toca **usar** para aplicar lo que alcance. Lo que falta se paga en **efectivo**, **transferencia** o **cheque** (con el número del cheque). Abajo ves cuánto de anticipos se aplica y cuánto se paga ahora. El pago cubre toda la compra: si necesitas pagar solo una parte, deja la compra por pagar y regístrala en Pagos.
+7. **Guardar.** Verás el código de la recepción (por ejemplo REC-2026-000024), el neto y el total, y si el pago quedó registrado. **Nueva recepción** te deja listo para el siguiente caficultor.
 
 ### Café seco: por calidad o a precio por kilo
 
@@ -74,7 +75,7 @@ Es un descuento de impuestos que algunos compradores deben hacer cuando compran 
 - **Préstamos:** plata que le prestas a un proveedor, con sus abonos.
 - **Estado de cuenta:** en Pagos puedes ver, por proveedor, cuánto le has comprado, pagado y adelantado.
 
-Todavía **no** se puede pagar en el mismo paso de la compra: se hace en Pagos. Está en construcción.
+También puedes pagar en el mismo paso de la compra (ver **Comprar café**). Para pagar solo una parte, o pagar más tarde, usa Pagos.
 
 ## Bodega, ventas, cortes, facturación y reportes
 

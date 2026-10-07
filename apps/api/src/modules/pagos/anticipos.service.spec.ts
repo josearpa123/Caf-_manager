@@ -87,6 +87,36 @@ describe('AnticiposService', () => {
     expect(r.saldoDisponible).toBe(500000);
   });
 
+  it('disponibles: solo anticipos del proveedor con saldo, con el saldo en texto Decimal', async () => {
+    const { service, prisma } = build();
+    prisma.anticipo.findMany.mockResolvedValue([
+      {
+        id: 'a1',
+        monto: '500000',
+        fecha: new Date('2026-10-01'),
+        conciliaciones: [{ montoAplicado: '0.10' }, { montoAplicado: '0.20' }],
+      },
+      {
+        id: 'a2',
+        monto: '100000',
+        fecha: new Date('2026-10-02'),
+        conciliaciones: [{ montoAplicado: '100000' }],
+      },
+    ]);
+    const r = await service.disponibles('p1');
+    expect(prisma.anticipo.findMany.mock.calls[0][0].where).toEqual({
+      proveedorId: 'p1',
+    });
+    expect(r).toEqual([
+      {
+        id: 'a1',
+        fecha: new Date('2026-10-01'),
+        monto: '500000',
+        saldoDisponible: '499999.7',
+      },
+    ]);
+  });
+
   it('findOne inexistente → 404', async () => {
     const { service, prisma } = build();
     prisma.anticipo.findUnique.mockResolvedValue(null);
