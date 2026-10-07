@@ -54,7 +54,13 @@ Vuelve a oprimir **Guardar**. El sistema reconoce que es la misma compra y **no 
 
 ### Si te equivocaste
 
-Una recepción guardada no se edita ni se borra, porque mueve plata e inventario. **Todavía no existe el botón para anularla** (está en construcción). Por ahora avísale a quien administra el sistema.
+Una recepción guardada no se edita ni se borra, porque mueve plata e inventario. Si te equivocaste, se **anula** y se registra una nueva con los datos correctos.
+
+Para anularla, abre la recepción y oprime **Anular**. El botón solo aparece si tienes el permiso para anular y la recepción sigue activa. El sistema te pide el motivo (entre 10 y 500 letras) y queda guardado con tu nombre y la fecha.
+
+Al anular, el café sale del inventario y se cancelan los pagos y las conciliaciones de anticipo que tenía esa recepción. La recepción sigue en el listado con la marca **Anulada**, para que quede el rastro.
+
+Si el café de esa recepción ya está en un secado o en una venta, o ya no queda en bodega, **no se puede anular todavía**. El mensaje te dice cuál secado o venta hay que revertir primero. Por ahora no hay una pantalla para deshacer un secado o una venta: avísale a quien administra el sistema.
 
 ## Retención en la fuente
 

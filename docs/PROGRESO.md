@@ -4,6 +4,14 @@
 
 **Última actualización:** 2026-10-03
 
+## Manual: cómo anular una recepción (sesión 2026-10-06)
+
+Rama `docs/manual-anulacion`. Solo documentación de usuario, sin cambios de código.
+
+- **Qué cambió**: `apps/web/content/manual.md`, sección "Si te equivocaste", ya no dice que anular no existe. Explica el botón **Anular**, el motivo (10 a 500 caracteres), qué se revierte y el bloqueo por secado, venta o falta de stock (RF-08).
+- **Cubre**: RF-07, RF-08 (lado usuario). Pruebas: ninguna, es texto.
+- **Pendiente / riesgos**: el texto sale de lo documentado en ADR-010 y no se recorrió a mano en el navegador. Falta la pantalla para revertir un secado o anular una venta. El manual sigue diciendo que no se puede pagar en el mismo paso de la compra (sigue siendo cierto).
+
 ## Sprint 2 · PR 2 — anulación de recepciones, cierra H4 (sesión 2026-10-03)
 
 Rama `feat/anulacion-recepcion`. Decisiones del usuario: incluir RF-08 (bloquear si está en un secado, una trilla o una venta y decir cuál revertir primero) y revertir pagos y conciliaciones en la misma transacción y con idempotencia. Detalle en `docs/adr/010-anulacion-de-recepciones.md`.
