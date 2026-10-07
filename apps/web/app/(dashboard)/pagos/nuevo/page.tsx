@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { Proveedor, PuntoCompra, Recepcion } from '@coffee-manager/shared-types';
 import { MetodoPago } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { useLlaveIdempotencia } from '@/lib/idempotencia';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +21,7 @@ const METODO_LABEL: Record<string, string> = {
 
 export default function NuevoPagoPage() {
   const router = useRouter();
+  const llaveDe = useLlaveIdempotencia();
 
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [puntosCompra, setPuntosCompra] = useState<PuntoCompra[]>([]);
@@ -69,7 +71,7 @@ export default function NuevoPagoPage() {
 
     setIsSubmitting(true);
     try {
-      await api.post('/pagos', {
+      const cuerpo = {
         proveedorId,
         puntoCompraId,
         recepcionId: recepcionId || undefined,
@@ -78,7 +80,8 @@ export default function NuevoPagoPage() {
         referencia: referencia || undefined,
         numeroCheque: metodoPago === MetodoPago.CHEQUE ? numeroCheque : undefined,
         notas: notas || undefined,
-      });
+      };
+      await api.post('/pagos', cuerpo, llaveDe(cuerpo));
       router.push('/pagos');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo registrar el pago');

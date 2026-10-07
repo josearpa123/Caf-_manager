@@ -42,7 +42,7 @@ Los diagramas de este documento son la versión para leer. El anexo trae los mis
 | H4 ✅ | No hay anulación de recepciones ni campo de estado | modelo `Recepcion` | Los errores de digitación se quedan para siempre o se borran sin rastro | Estado + anulación con movimiento compensatorio (sprint 2; hecho en el backend y en el detalle de la web, ADR-010) |
 | H5 ✅ | No hay cálculo de retención en la fuente | dominio de recepción y pagos | Incumplimiento tributario del cliente; argumento de venta perdido | Parámetros tributarios con vigencia (sprint 2) |
 | H6 | No hay cola de trabajos; Redis está en el compose pero la API no lo usa | infraestructura | Generar PDFs, enviar WhatsApp o llamar a la DIAN dentro de la petición la vuelve lenta y frágil | BullMQ sobre Redis (sprint 3) |
-| H7 ✅ | No hay protección contra reintentos (idempotencia) | `POST /recepciones` | Con mala señal, el usuario oprime dos veces y se crean dos recepciones | Llave de idempotencia por petición (sprint 1; backend de recepción hecho, ver ADR-007; backend de pagos, anticipos y ventas hecho; falta enviarla desde la web) |
+| H7 ✅ | No hay protección contra reintentos (idempotencia) | `POST /recepciones` | Con mala señal, el usuario oprime dos veces y se crean dos recepciones | Llave de idempotencia por petición (sprint 1; backend de recepción hecho, ver ADR-007; backend de pagos, anticipos y ventas hecho; la web ya la envía en recepción, anulación, pagos, anticipos y ventas; falta en conciliaciones, cuyo endpoint aún no la acepta) |
 | H8 | El módulo de facturación modela "factura" por recepción | modelo `Factura` | La compra a un caficultor no obligado se soporta con documento soporte, no con factura | Generalizar a `DocumentoElectronico` con tipo (fase 2) |
 
 ## Plan de desarrollo

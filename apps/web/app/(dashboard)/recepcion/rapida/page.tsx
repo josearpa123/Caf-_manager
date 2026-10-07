@@ -16,6 +16,7 @@ import type {
   RetencionPrevia,
 } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { nuevaLlave } from '@/lib/idempotencia';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -52,11 +53,6 @@ const num = (texto: string) => {
   return t === '' ? NaN : Number(t);
 };
 const redondear2 = (n: number) => Math.round(n * 100) / 100;
-
-function nuevaLlave() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  return `rr-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
-}
 
 interface CampoProps {
   id: string;

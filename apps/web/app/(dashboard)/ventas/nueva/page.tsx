@@ -11,6 +11,7 @@ import type {
 } from '@coffee-manager/shared-types';
 import { TipoInventario } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { useLlaveIdempotencia } from '@/lib/idempotencia';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +34,7 @@ function formatMoney(value: number) {
 
 export default function NuevaVentaPage() {
   const router = useRouter();
+  const llaveDe = useLlaveIdempotencia();
   const searchParams = useSearchParams();
 
   const [puntosCompra, setPuntosCompra] = useState<PuntoCompra[]>([]);
@@ -158,7 +160,7 @@ export default function NuevaVentaPage() {
 
     setIsSubmitting(true);
     try {
-      const venta = await api.post<{ id: string }>('/ventas', {
+      const cuerpo = {
         puntoCompraId,
         contratoVentaId: contratoVentaId || undefined,
         tipoCafe: contrato ? undefined : tipoCafe,
@@ -171,7 +173,8 @@ export default function NuevaVentaPage() {
           recepcionId: l.recepcionId,
           cantidadKgAtribuida: Number(l.cantidadKgAtribuida),
         })),
-      });
+      };
+      const venta = await api.post<{ id: string }>('/ventas', cuerpo, llaveDe(cuerpo));
       router.push(`/ventas/${venta.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo registrar la venta');

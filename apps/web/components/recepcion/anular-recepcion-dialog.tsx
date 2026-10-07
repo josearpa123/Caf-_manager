@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import type { Recepcion } from '@coffee-manager/shared-types';
 import { api, ApiError } from '@/lib/api';
+import { nuevaLlave } from '@/lib/idempotencia';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -16,11 +17,6 @@ import {
 } from '@/components/ui/dialog';
 
 const MIN_MOTIVO = 10;
-
-function nuevaLlave() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  return `an-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
-}
 
 interface Props {
   recepcion: Pick<Recepcion, 'id' | 'codigo'>;
