@@ -26,6 +26,20 @@ Rama `docs/manual-anulacion`. Solo documentación de usuario, sin cambios de có
 - **Cubre**: RF-07, RF-08 (lado usuario). Pruebas: ninguna, es texto.
 - **Pendiente / riesgos**: el texto sale de lo documentado en ADR-010 y no se recorrió a mano en el navegador. Falta la pantalla para revertir un secado o anular una venta. El manual sigue diciendo que no se puede pagar en el mismo paso de la compra (sigue siendo cierto).
 
+## Sprint 2 · PR 4 — la web envía la llave de idempotencia en pagos, anticipos y ventas (sesión 2026-10-06)
+
+Rama `feat/idempotencia-web-pagos`. Cierra el pendiente de H7 / ADR-007: el backend ya aceptaba la llave, pero la web solo la mandaba en recepción y anulación.
+
+- **Cubre**: H7, regla 6 (lado web). Ningún RF nuevo.
+- **Qué cambió**: nuevo `apps/web/lib/idempotencia.ts` con `nuevaLlave()` y el hook `useLlaveIdempotencia()` (mismo cuerpo → misma llave; cuerpo distinto → llave nueva). Lo usan `pagos/nuevo`, `pagos/anticipos/nuevo` y `ventas/nueva`. La recepción rápida y el diálogo de anulación dejaron sus copias locales de `nuevaLlave` y usan la compartida.
+- **Pruebas**: ninguna nueva. La web no tiene ejecutor de pruebas y no se agregaron dependencias; el comportamiento del backend ya está en `idempotencia.int-spec.ts`. Lint y build de la web en verde. No se probó a mano en el navegador.
+- **Cómo probarlo a mano**: en Pagos → Nuevo pago, cortar la red, oprimir Guardar, restablecerla y oprimir Guardar otra vez: debe quedar un solo pago.
+
+### Pendiente / riesgos
+- `POST /conciliaciones` (pantalla del detalle del anticipo) no acepta la llave ni en la API ni en la web: sigue sin protección contra doble clic.
+- **Sigue sin hacerse el pago en el mismo paso de la compra (RF-10)**; es el siguiente PR y toca API y web.
+- El manual no cambió: sigue siendo cierto que no se paga en el mismo paso.
+
 ## Sprint 2 · PR 2 — anulación de recepciones, cierra H4 (sesión 2026-10-03)
 
 Rama `feat/anulacion-recepcion`. Decisiones del usuario: incluir RF-08 (bloquear si está en un secado, una trilla o una venta y decir cuál revertir primero) y revertir pagos y conciliaciones en la misma transacción y con idempotencia. Detalle en `docs/adr/010-anulacion-de-recepciones.md`.
