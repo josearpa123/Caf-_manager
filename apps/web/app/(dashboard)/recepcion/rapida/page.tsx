@@ -25,6 +25,13 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { ProveedorBuscador } from '@/components/recepcion/proveedor-buscador';
 import { AltaExpressProveedor } from '@/components/recepcion/alta-express-proveedor';
+import {
+  montoDigitado,
+  PAGO_INICIAL,
+  PagoEnRecepcion,
+  totalAplicado,
+  type PagoForm,
+} from '@/components/recepcion/pago-en-recepcion';
 
 type Tipo = 'MOJADO' | 'PERGAMINO' | 'PASILLA';
 
@@ -136,9 +143,11 @@ export default function RecepcionRapidaPage() {
 
   const [precio, setPrecio] = useState<PrecioVigente | null | 'cargando'>(null);
   const [retencion, setRetencion] = useState<RetencionPrevia | null>(null);
+  const [pagoForm, setPagoForm] = useState<PagoForm>(PAGO_INICIAL);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [creada, setCreada] = useState<RecepcionCreada | null>(null);
+  const [seRegistroPago, setSeRegistroPago] = useState(false);
 
   useEffect(() => {
     api
@@ -234,6 +243,10 @@ export default function RecepcionRapidaPage() {
     };
   }, [aplicaRetencion, tipo, valorTotal]);
 
+  // Neto a pagar de la compra (con retención si aplica): base del pago en el mismo paso.
+  const netoAPagar =
+    aplicaRetencion && retencion?.aplica ? Number(retencion.netoPagar) : valorTotal;
+
   // ── Enter avanza al siguiente campo; en el último, guarda ──
   const onFormKeyDown = (e: KeyboardEvent<HTMLFormElement>) => {
     if (e.key !== 'Enter') return;
@@ -272,6 +285,7 @@ export default function RecepcionRapidaPage() {
     setPrecioDirecto('');
     setPrecio(null);
     setRetencion(null);
+    setPagoForm(PAGO_INICIAL);
     setError(null);
     setCreada(null);
     intento.current = null;
@@ -325,6 +339,25 @@ export default function RecepcionRapidaPage() {
       payload.precioKg = precioKg;
     }
 
+    if (pagoForm.pagarAhora) {
+      if (!Number.isFinite(netoAPagar)) return setError('Falta el valor de la compra para poder pagar');
+      if (pagoForm.metodo === 'CHEQUE' && !pagoForm.numeroCheque.trim()) {
+        return setError('Escribe el número de cheque');
+      }
+      const aplicado = totalAplicado(pagoForm.aplicado);
+      if (aplicado > netoAPagar) {
+        return setError('Los anticipos aplicados superan lo que hay que pagar');
+      }
+      const anticipos = Object.entries(pagoForm.aplicado)
+        .map(([anticipoId, texto]) => ({ anticipoId, montoAplicado: montoDigitado(texto) }))
+        .filter((a) => a.montoAplicado > 0);
+      payload.pago = {
+        metodoPago: pagoForm.metodo,
+        ...(pagoForm.metodo === 'CHEQUE' ? { numeroCheque: pagoForm.numeroCheque.trim() } : {}),
+        ...(anticipos.length > 0 ? { anticipos } : {}),
+      };
+    }
+
     // Mismo cuerpo → misma llave (reintento seguro); cuerpo distinto → llave nueva.
     const huella = JSON.stringify(payload);
     if (!intento.current || intento.current.huella !== huella) {
@@ -337,6 +370,7 @@ export default function RecepcionRapidaPage() {
         'Idempotency-Key': intento.current.llave,
       });
       setCreada(r);
+      setSeRegistroPago(!!payload.pago);
       setTimeout(() => nuevaRef.current?.focus(), 0);
     } catch (err) {
       setError(
@@ -394,6 +428,9 @@ export default function RecepcionRapidaPage() {
               </div>
             </dl>
           )}
+          <p className="mt-4 text-sm font-medium">
+            {seRegistroPago ? 'Pago registrado en este paso.' : 'Queda por pagar.'}
+          </p>
           <div className="mt-5 flex flex-wrap gap-2">
             <Button ref={nuevaRef} type="button" size="lg" onClick={reiniciar} className="h-12 flex-1">
               Nueva recepción
@@ -678,6 +715,13 @@ export default function RecepcionRapidaPage() {
             </p>
           )}
         </section>
+
+        <PagoEnRecepcion
+          proveedorId={proveedor?.id ?? null}
+          neto={netoAPagar}
+          value={pagoForm}
+          onChange={setPagoForm}
+        />
 
         {error && (
           <p role="alert" className="text-sm text-destructive">

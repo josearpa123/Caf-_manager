@@ -370,6 +370,14 @@ export interface ConciliacionAnticipo {
   pago: { id: string; fecha: string; monto: string } | null;
 }
 
+// GET /anticipos/disponibles: anticipos del proveedor con saldo por aplicar (montos en texto decimal).
+export interface AnticipoDisponible {
+  id: string;
+  fecha: string;
+  monto: string;
+  saldoDisponible: string;
+}
+
 export interface AnticipoDetalle extends Anticipo {
   conciliaciones: ConciliacionAnticipo[];
   montoConciliado: number;

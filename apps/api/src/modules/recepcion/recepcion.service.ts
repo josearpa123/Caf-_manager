@@ -25,7 +25,9 @@ import {
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { TablaPreciosService } from './tabla-precios.service';
+import { liquidarPago, type LiquidacionPago } from './pago-en-recepcion';
 import { CreateRecepcionDto } from './dto/create-recepcion.dto';
+import type { PagoRecepcionDto } from './dto/pago-recepcion.dto';
 import { QueryRecepcionesDto } from './dto/query-recepciones.dto';
 
 // Factor de rendimiento en convención FNC: kg de café pergamino necesarios
@@ -62,6 +64,13 @@ const INVENTARIO_POR_TIPO: Record<TipoCafeRecepcion, TipoInventario> = {
   [TipoCafeRecepcion.PERGAMINO]: TipoInventario.PERGAMINO,
   [TipoCafeRecepcion.PASILLA]: TipoInventario.PASILLA,
 };
+
+// Cliente dentro de una transacción interactiva: el mismo cliente extendido
+// (con tenant-scoping) pero sin los métodos de nivel raíz.
+type TenantTx = Omit<
+  TenantPrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
 
 // Lo que la recepción lee de ConfiguracionTenant.
 type ConfigRecepcion = {
@@ -286,6 +295,91 @@ export class RecepcionService {
     });
   }
 
+  // RF-10: paga la recepción en la misma transacción que la crea. Aplica los
+  // anticipos (conciliaciones) y registra un Pago por el saldo restante. Si algo
+  // falla, no queda ni la recepción ni el pago.
+  private async registrarPago(
+    tx: TenantTx,
+    tenantId: string,
+    createdById: string,
+    recepcion: { id: string; codigo: string; fecha: Date },
+    dto: CreateRecepcionDto,
+    pago: PagoRecepcionDto,
+    liquidacion: LiquidacionPago,
+  ) {
+    const aplicaciones = [...(pago.anticipos ?? [])].sort((a, b) =>
+      a.anticipoId.localeCompare(b.anticipoId),
+    );
+
+    // Candado por anticipo, en orden fijo: dos recepciones que usen el mismo
+    // anticipo se serializan y la segunda ve el saldo ya consumido.
+    for (const a of aplicaciones) {
+      await tx.$queryRaw`SELECT "id" FROM "Anticipo" WHERE "id" = ${a.anticipoId} FOR UPDATE`;
+      const anticipo = await tx.anticipo.findUnique({
+        where: { id: a.anticipoId },
+        include: {
+          conciliaciones: {
+            where: { anuladoAt: null },
+            select: { montoAplicado: true },
+          },
+        },
+      });
+      if (!anticipo) {
+        throw new BadRequestException(
+          'Uno de los anticipos indicados no existe en este negocio',
+        );
+      }
+      if (anticipo.proveedorId !== dto.proveedorId) {
+        throw new BadRequestException(
+          'Uno de los anticipos no pertenece a este proveedor',
+        );
+      }
+      const disponible = anticipo.conciliaciones.reduce(
+        (acc, c) => acc.minus(c.montoAplicado),
+        new Prisma.Decimal(anticipo.monto),
+      );
+      if (new Prisma.Decimal(a.montoAplicado).gt(disponible)) {
+        throw new BadRequestException(
+          `El anticipo no tiene saldo suficiente: disponible ${disponible.toFixed(2)}, se intentó aplicar ${new Prisma.Decimal(a.montoAplicado).toFixed(2)}`,
+        );
+      }
+    }
+
+    const pagoCreado = liquidacion.saldoAPagar.gt(0)
+      ? await tx.pago.create({
+          data: {
+            tenantId,
+            proveedorId: dto.proveedorId,
+            puntoCompraId: dto.puntoCompraId,
+            recepcionId: recepcion.id,
+            monto: liquidacion.saldoAPagar,
+            fecha: recepcion.fecha,
+            metodoPago: pago.metodoPago,
+            referencia: pago.referencia,
+            numeroCheque: pago.numeroCheque,
+            notas: `Pago en el mismo paso de ${recepcion.codigo}`,
+            createdById,
+          },
+        })
+      : null;
+
+    for (const a of aplicaciones) {
+      await tx.conciliacionAnticipo.create({
+        data: {
+          tenantId,
+          proveedorId: dto.proveedorId,
+          anticipoId: a.anticipoId,
+          recepcionId: recepcion.id,
+          pagoId: pagoCreado?.id,
+          montoAplicado: a.montoAplicado,
+          fecha: recepcion.fecha,
+          notas: `Aplicado en el mismo paso de ${recepcion.codigo}`,
+          createdById,
+        },
+      });
+    }
+  }
+
   private async crear(
     tenantId: string,
     createdById: string,
@@ -361,6 +455,12 @@ export class RecepcionService {
       valorTotal.toFixed(2),
       diaColombia(fecha),
     );
+
+    // RF-10: se valida antes de gastar un consecutivo. El saldo de cada anticipo
+    // se revisa dentro de la transacción, con la fila bloqueada.
+    const liquidacion = dto.pago
+      ? liquidarPago(retencion.netoPagar, dto.pago.anticipos ?? [])
+      : null;
 
     try {
       // Consecutivo atómico en su propia sentencia (no dentro de la transacción):
@@ -440,6 +540,18 @@ export class RecepcionService {
               })),
             });
           }
+        }
+
+        if (dto.pago && liquidacion) {
+          await this.registrarPago(
+            tx,
+            tenantId,
+            createdById,
+            { id: recepcion.id, codigo, fecha },
+            dto,
+            dto.pago,
+            liquidacion,
+          );
         }
 
         await pasos.completar(tx, recepcion.id);

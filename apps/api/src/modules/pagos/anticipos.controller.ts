@@ -27,6 +27,13 @@ export class AnticiposController {
     return this.anticiposService.findAll(query);
   }
 
+  // Antes de `:id` para que "disponibles" no se tome como un id.
+  @RequirePermissions(Permission.ANTICIPOS_VER)
+  @Get('disponibles')
+  disponibles(@Query('proveedorId') proveedorId: string) {
+    return this.anticiposService.disponibles(proveedorId);
+  }
+
   @RequirePermissions(Permission.ANTICIPOS_VER)
   @Get(':id')
   findOne(@Param('id') id: string) {

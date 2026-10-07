@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import { TipoCafeRecepcion } from '@prisma/client';
 import { CreateAnalisisCalidadDto } from './create-analisis-calidad.dto';
+import { PagoRecepcionDto } from './pago-recepcion.dto';
 
 export class CreateRecepcionDto {
   @IsString()
@@ -60,4 +61,11 @@ export class CreateRecepcionDto {
   @IsNumber()
   @IsPositive()
   precioKg?: number;
+
+  // RF-10: pagar en el mismo paso (anticipos y/o método de pago). Si se omite,
+  // la recepción queda por pagar y se paga después desde Pagos.
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PagoRecepcionDto)
+  pago?: PagoRecepcionDto;
 }

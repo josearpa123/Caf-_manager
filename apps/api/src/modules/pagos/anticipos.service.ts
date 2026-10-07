@@ -44,6 +44,37 @@ export class AnticiposService {
     });
   }
 
+  // Anticipos del proveedor que aún tienen saldo por aplicar (RF-10: se ofrecen
+  // en la recepción para descontarlos en el mismo paso). Saldo en Decimal (regla 1).
+  async disponibles(proveedorId: string) {
+    if (!proveedorId) throw new BadRequestException('Indica el proveedor');
+    const anticipos = await this.prisma.anticipo.findMany({
+      where: { proveedorId },
+      include: {
+        conciliaciones: {
+          where: { anuladoAt: null },
+          select: { montoAplicado: true },
+        },
+      },
+      orderBy: { fecha: 'asc' },
+    });
+    return anticipos
+      .map((a) => ({
+        id: a.id,
+        fecha: a.fecha,
+        monto: a.monto.toString(),
+        saldo: a.conciliaciones.reduce(
+          (acc, c) => acc.minus(c.montoAplicado),
+          new Prisma.Decimal(a.monto),
+        ),
+      }))
+      .filter((a) => a.saldo.gt(0))
+      .map(({ saldo, ...resto }) => ({
+        ...resto,
+        saldoDisponible: saldo.toString(),
+      }));
+  }
+
   async findOne(id: string) {
     const anticipo = await this.prisma.anticipo.findUnique({
       where: { id },
