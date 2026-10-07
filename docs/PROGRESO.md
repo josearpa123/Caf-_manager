@@ -2,7 +2,21 @@
 
 > Este archivo se actualiza al final de cada sesión de trabajo relevante. Es lo primero que hay que leer al retomar el proyecto (junto con `docs/requerimientos.md` para decisiones de diseño ya tomadas).
 
-**Última actualización:** 2026-10-03
+**Última actualización:** 2026-10-06
+
+## Sprint 2 · PR 3 — reportes en día de Colombia (sesión 2026-10-06)
+
+Rama `fix/reportes-dia-colombia`. Cierra el pendiente "reportes agrupan en UTC" que dejó el PR de zona horaria (ADR-009).
+
+- **Cubre**: H5 (zona horaria, parte de reportes), ADR-009. Ningún RF nuevo.
+- **Qué cambió**: los filtros `desde`/`hasta` van de 00:00:00.000 a 23:59:59.999 hora de Bogotá (antes `desde` era medianoche UTC y `hasta` 23:59 UTC, así que una compra de las 8 p. m. contaba para el día siguiente). El agrupado por semana, mes y trimestre usa el día de Colombia (el 31-dic a las 8 p. m. sigue en diciembre). Las fechas del CSV y del Excel salen como día de Colombia. Nuevos `inicioDiaColombia`, `finDiaColombia` y `enHoraColombia` en `common/fecha-colombia.ts`; los períodos pasaron a `reportes/periodos.ts` para poder probarlos.
+- **Sin migración**: no cambia el schema ni los datos guardados (siguen siendo instantes UTC).
+- **Pruebas**: 9 unitarias nuevas (rangos, borde de las 5 a. m. UTC, 8 p. m. del 30-sep en septiembre, semana ISO 2026-W53) y 1 de integración con PostgreSQL real (dashboard y CSV: la compra de las 8 p. m. aparece en su día y no en el siguiente). API: 201 unitarias y 47 de integración.
+
+### Pendiente / riesgos
+- Fuera de reportes, `viajes.service.ts` también usa `toISOString()`; revisar si muestra fechas de calendario.
+- `estadoCuenta` y reportes siguen sumando plata con `number` (regla 1): deuda anterior.
+- Cómo probarlo a mano: crear una compra pasadas las 7 p. m. y ver que el reporte del día de hoy la incluya.
 
 ## Sprint 2 · PR 2 — anulación de recepciones, cierra H4 (sesión 2026-10-03)
 

@@ -1,82 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import {
-  EstadoRecepcion,
-  MetodoPago,
-  Prisma,
-  TipoCafeRecepcion,
-} from '@prisma/client';
+import { EstadoRecepcion, MetodoPago, TipoCafeRecepcion } from '@prisma/client';
 import ExcelJS from 'exceljs';
 import { InjectTenantPrisma } from '../../prisma/inject-tenant-prisma.decorator';
 import type { TenantPrismaClient } from '../../prisma/tenant-prisma.provider';
 import { BodegaService } from '../bodega/bodega.service';
 import { QueryReportesDto } from './dto/query-reportes.dto';
-import { AgrupacionCorte, QueryCortesDto } from './dto/query-cortes.dto';
+import type { AgrupacionCorte } from './dto/query-cortes.dto';
+import { QueryCortesDto } from './dto/query-cortes.dto';
+import { buildFechaWhere, periodoDe } from './periodos';
+import { isoDiaColombia } from '../../common/fecha-colombia';
 
 const TOP_PROVEEDORES_SALDO = 10;
-
-const MESES_ES = [
-  'ene',
-  'feb',
-  'mar',
-  'abr',
-  'may',
-  'jun',
-  'jul',
-  'ago',
-  'sep',
-  'oct',
-  'nov',
-  'dic',
-];
-
-// Número de semana ISO-8601 (la semana empieza en lunes; la semana 1 es la que
-// contiene el primer jueves del año). Devuelve el año ISO, que puede diferir del
-// año calendario en los bordes de diciembre/enero.
-function isoWeek(date: Date): { year: number; week: number } {
-  const d = new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-  );
-  const dayNum = d.getUTCDay() || 7; // domingo (0) -> 7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum); // jueves de esta semana
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const week = Math.ceil(
-    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
-  );
-  return { year: d.getUTCFullYear(), week };
-}
-
-// Clave ordenable + etiqueta legible del período al que pertenece una fecha,
-// según la agrupación pedida.
-function periodoDe(
-  fecha: Date,
-  agrupacion: AgrupacionCorte,
-): { clave: string; etiqueta: string } {
-  const year = fecha.getUTCFullYear();
-  const month = fecha.getUTCMonth();
-  if (agrupacion === 'semana') {
-    const { year: wy, week } = isoWeek(fecha);
-    const ww = String(week).padStart(2, '0');
-    return { clave: `${wy}-W${ww}`, etiqueta: `Sem ${week} · ${wy}` };
-  }
-  if (agrupacion === 'trimestre') {
-    const q = Math.floor(month / 3) + 1;
-    return { clave: `${year}-Q${q}`, etiqueta: `Q${q} ${year}` };
-  }
-  // mes (por defecto)
-  const mm = String(month + 1).padStart(2, '0');
-  return { clave: `${year}-${mm}`, etiqueta: `${MESES_ES[month]} ${year}` };
-}
-
-function buildFechaWhere(
-  desde?: string,
-  hasta?: string,
-): Prisma.DateTimeFilter | undefined {
-  if (!desde && !hasta) return undefined;
-  return {
-    gte: desde ? new Date(desde) : undefined,
-    lte: hasta ? new Date(`${hasta}T23:59:59.999Z`) : undefined,
-  };
-}
 
 function csvEscape(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
@@ -120,7 +54,10 @@ export class ReportesService {
       pagos.map((p) => [p.proveedorId, Number(p._sum.monto ?? 0)]),
     );
     const totalConciliado = new Map(
-      conciliaciones.map((c) => [c.proveedorId, Number(c._sum.montoAplicado ?? 0)]),
+      conciliaciones.map((c) => [
+        c.proveedorId,
+        Number(c._sum.montoAplicado ?? 0),
+      ]),
     );
 
     const porProveedor = proveedores
@@ -129,13 +66,20 @@ export class ReportesService {
           (totalComprado.get(p.id) ?? 0) -
           (totalPagado.get(p.id) ?? 0) -
           (totalConciliado.get(p.id) ?? 0);
-        return { proveedorId: p.id, proveedorNombre: p.nombre, saldoPendienteEstimado };
+        return {
+          proveedorId: p.id,
+          proveedorNombre: p.nombre,
+          saldoPendienteEstimado,
+        };
       })
       .filter((p) => p.saldoPendienteEstimado > 0)
       .sort((a, b) => b.saldoPendienteEstimado - a.saldoPendienteEstimado);
 
     return {
-      totalEstimado: porProveedor.reduce((acc, p) => acc + p.saldoPendienteEstimado, 0),
+      totalEstimado: porProveedor.reduce(
+        (acc, p) => acc + p.saldoPendienteEstimado,
+        0,
+      ),
       proveedores: porProveedor.slice(0, TOP_PROVEEDORES_SALDO),
     };
   }
@@ -144,35 +88,40 @@ export class ReportesService {
     const fecha = buildFechaWhere(query.desde, query.hasta);
     const puntoCompraId = query.puntoCompraId;
 
-    const [comprasPorTipo, analisisAgg, ventasPorTipo, inventario, saldoProveedores] =
-      await Promise.all([
-        this.prisma.recepcion.groupBy({
-          by: ['tipoCafe'],
-          where: { puntoCompraId, fecha, estado: EstadoRecepcion.ACTIVA },
-          _sum: { pesoNeto: true, valorTotal: true },
-          _count: true,
-        }),
-        this.prisma.analisisCalidad.aggregate({
-          where: {
-            recepcion: {
-              puntoCompraId,
-              fecha,
-              estado: EstadoRecepcion.ACTIVA,
-              tipoCafe: TipoCafeRecepcion.PERGAMINO,
-            },
+    const [
+      comprasPorTipo,
+      analisisAgg,
+      ventasPorTipo,
+      inventario,
+      saldoProveedores,
+    ] = await Promise.all([
+      this.prisma.recepcion.groupBy({
+        by: ['tipoCafe'],
+        where: { puntoCompraId, fecha, estado: EstadoRecepcion.ACTIVA },
+        _sum: { pesoNeto: true, valorTotal: true },
+        _count: true,
+      }),
+      this.prisma.analisisCalidad.aggregate({
+        where: {
+          recepcion: {
+            puntoCompraId,
+            fecha,
+            estado: EstadoRecepcion.ACTIVA,
+            tipoCafe: TipoCafeRecepcion.PERGAMINO,
           },
-          _avg: { humedad: true, factorRendimiento: true },
-          _count: true,
-        }),
-        this.prisma.venta.groupBy({
-          by: ['tipoCafe'],
-          where: { puntoCompraId, fecha },
-          _sum: { cantidadKg: true, valorTotal: true },
-          _count: true,
-        }),
-        this.bodegaService.getInventario({ puntoCompraId }),
-        this.saldoPendienteProveedores(),
-      ]);
+        },
+        _avg: { humedad: true, factorRendimiento: true },
+        _count: true,
+      }),
+      this.prisma.venta.groupBy({
+        by: ['tipoCafe'],
+        where: { puntoCompraId, fecha },
+        _sum: { cantidadKg: true, valorTotal: true },
+        _count: true,
+      }),
+      this.bodegaService.getInventario({ puntoCompraId }),
+      this.saldoPendienteProveedores(),
+    ]);
 
     const compras = {
       porTipo: comprasPorTipo.map((c) => ({
@@ -181,8 +130,14 @@ export class ReportesService {
         valor: Number(c._sum.valorTotal ?? 0),
         cantidad: c._count,
       })),
-      totalKg: comprasPorTipo.reduce((acc, c) => acc + Number(c._sum.pesoNeto ?? 0), 0),
-      totalValor: comprasPorTipo.reduce((acc, c) => acc + Number(c._sum.valorTotal ?? 0), 0),
+      totalKg: comprasPorTipo.reduce(
+        (acc, c) => acc + Number(c._sum.pesoNeto ?? 0),
+        0,
+      ),
+      totalValor: comprasPorTipo.reduce(
+        (acc, c) => acc + Number(c._sum.valorTotal ?? 0),
+        0,
+      ),
     };
 
     const ventas = {
@@ -192,8 +147,14 @@ export class ReportesService {
         valor: Number(v._sum.valorTotal ?? 0),
         cantidad: v._count,
       })),
-      totalKg: ventasPorTipo.reduce((acc, v) => acc + Number(v._sum.cantidadKg ?? 0), 0),
-      totalValor: ventasPorTipo.reduce((acc, v) => acc + Number(v._sum.valorTotal ?? 0), 0),
+      totalKg: ventasPorTipo.reduce(
+        (acc, v) => acc + Number(v._sum.cantidadKg ?? 0),
+        0,
+      ),
+      totalValor: ventasPorTipo.reduce(
+        (acc, v) => acc + Number(v._sum.valorTotal ?? 0),
+        0,
+      ),
     };
 
     return {
@@ -201,7 +162,9 @@ export class ReportesService {
       ventas,
       margenBrutoPeriodo: ventas.totalValor - compras.totalValor,
       calidadPromedio: {
-        humedadPromedio: analisisAgg._avg.humedad ? Number(analisisAgg._avg.humedad) : null,
+        humedadPromedio: analisisAgg._avg.humedad
+          ? Number(analisisAgg._avg.humedad)
+          : null,
         factorRendimientoPromedio: analisisAgg._avg.factorRendimiento
           ? Number(analisisAgg._avg.factorRendimiento)
           : null,
@@ -242,11 +205,22 @@ export class ReportesService {
 
     const periodosMap = new Map<
       string,
-      { clave: string; etiqueta: string; cortes: number; kg: number; valor: number }
+      {
+        clave: string;
+        etiqueta: string;
+        cortes: number;
+        kg: number;
+        valor: number;
+      }
     >();
     const compradoresMap = new Map<
       string,
-      { compradorNombre: string; viajes: Set<string>; kg: number; valor: number }
+      {
+        compradorNombre: string;
+        viajes: Set<string>;
+        kg: number;
+        valor: number;
+      }
     >();
 
     const viajesResumen = relevantes.map((v) => {
@@ -357,7 +331,7 @@ export class ReportesService {
     const rows = recepciones.map((r) =>
       [
         r.codigo,
-        r.fecha.toISOString().slice(0, 10),
+        isoDiaColombia(r.fecha),
         csvEscape(r.proveedor.nombre),
         csvEscape(r.puntoCompra.nombre),
         r.tipoCafe,
@@ -423,7 +397,10 @@ export class ReportesService {
         indicador: 'Factor de rendimiento promedio (pergamino)',
         valor: data.calidadPromedio.factorRendimientoPromedio,
       },
-      { indicador: 'Muestras de calidad', valor: data.calidadPromedio.muestras },
+      {
+        indicador: 'Muestras de calidad',
+        valor: data.calidadPromedio.muestras,
+      },
       {
         indicador: 'Saldo pendiente estimado (total proveedores)',
         valor: data.saldoProveedores.totalEstimado,
@@ -465,7 +442,11 @@ export class ReportesService {
     const saldoSheet = workbook.addWorksheet('Saldo proveedores');
     saldoSheet.columns = [
       { header: 'Proveedor', key: 'proveedorNombre', width: 28 },
-      { header: 'Saldo pendiente estimado', key: 'saldoPendienteEstimado', width: 24 },
+      {
+        header: 'Saldo pendiente estimado',
+        key: 'saldoPendienteEstimado',
+        width: 24,
+      },
     ];
     styleHeader(saldoSheet.getRow(1));
     saldoSheet.addRows(data.saldoProveedores.proveedores);
@@ -490,7 +471,7 @@ export class ReportesService {
     detalleSheet.addRows(
       recepciones.map((r) => ({
         codigo: r.codigo,
-        fecha: r.fecha.toISOString().slice(0, 10),
+        fecha: isoDiaColombia(r.fecha),
         proveedor: r.proveedor.nombre,
         puntoCompra: r.puntoCompra.nombre,
         tipoCafe: r.tipoCafe,
